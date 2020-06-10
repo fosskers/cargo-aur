@@ -1,0 +1,14 @@
+[package]
+name = "cargo-aur"
+version = "1.0.0"
+authors = ["Colin Woodbury <colin@fosskers.ca>"]
+edition = "2018"
+description = "Prepare Rust projects to be released on the Arch Linux User Repository."
+homepage = "https://github.com/fosskers/cargo-aur"
+repository = "https://github.com/fosskers/cargo-aur"
+readme = "README.md"
+license = "MIT"
+keywords = ["cargo", "subcommand", "archlinux", "aur"]
+categories = ["cargo-plugins", "command-line-utilities"]
+
+[dependencies]
