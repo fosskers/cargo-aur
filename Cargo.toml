@@ -13,6 +13,7 @@ categories = ["cargo-plugins", "command-line-utilities"]
 
 [dependencies]
 auto_from = "0.3"
+itertools = "0.9"
 toml = "0.5"
 serde = "1.0"
 serde_derive = "1.0"

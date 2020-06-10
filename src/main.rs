@@ -1,4 +1,5 @@
 use auto_from::From;
+use itertools::Itertools;
 use serde_derive::Deserialize;
 use std::{fmt, fs, io, process};
 
@@ -20,6 +21,7 @@ struct Package {
     authors: Vec<String>,
     description: String,
     homepage: String,
+    repository: String,
     license: String,
 }
 
@@ -69,6 +71,7 @@ fn cargo_config() -> Result<Config, Error> {
 fn pkgbuild(package: Package) -> String {
     format!(
         r#"
+{}
 pkgname={}-bin
 pkgver={}
 pkgrel=1
@@ -78,12 +81,28 @@ license=('{}')
 arch=('x86_64')
 provides=('{}')
 options=('strip')
+source=({}/releases/download/v$pkgver/{}-$pkgver-x86_64.tar.gz)
+md5sums=('{}')
+
+package() {{
+    mkdir -p "$pkgdir/usr/bin/"
+    install -m 755 {} "$pkgdir/usr/bin/"
+}}
 "#,
+        package
+            .authors
+            .iter()
+            .map(|a| format!("# Maintainer: {}", a))
+            .join("\n"),
         package.name,
         package.version,
         package.description,
         package.homepage,
         package.license,
-        package.name
+        package.name,
+        package.repository,
+        package.name,
+        "Uh oh!",
+        package.name,
     )
 }
