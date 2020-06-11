@@ -42,13 +42,6 @@ impl fmt::Display for Error {
     }
 }
 
-// TODO See how binary size is affected by removing `auto_from`.
-// impl From<io::Error> for Error {
-//     fn from(error: io::Error) -> Self {
-//         Error::Io(error)
-//     }
-// }
-
 fn main() {
     match work() {
         Err(e) => {
