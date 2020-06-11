@@ -1,8 +1,8 @@
 use auto_from::From;
 use itertools::Itertools;
 use serde_derive::Deserialize;
-use std::process::Command;
-use std::{fmt, fs, io, process};
+use std::process::{self, Command};
+use std::{fmt, fs, io};
 
 // What it needs to do:
 // 1. Read Cargo.toml and produce PKGBUILD.
@@ -14,7 +14,6 @@ struct Config {
     package: Package,
 }
 
-// TODO See how binary size is affected by taking on a `versions` dep.
 #[derive(Deserialize, Debug)]
 struct Package {
     name: String,
@@ -61,9 +60,9 @@ fn main() {
 fn work() -> Result<(), Error> {
     let config = cargo_config()?;
     release_build()?;
-    tarball()?;
+    tarball(&config.package)?;
     let md5 = md5sum()?;
-    let pkgbuild = pkgbuild(config.package, md5);
+    let pkgbuild = pkgbuild(&config.package, &md5);
     println!("{}", pkgbuild);
 
     Ok(())
@@ -76,7 +75,7 @@ fn cargo_config() -> Result<Config, Error> {
 }
 
 /// Produce a legal PKGBUILD.
-fn pkgbuild(package: Package, md5: String) -> String {
+fn pkgbuild(package: &Package, md5: &str) -> String {
     format!(
         r#"
 {}
@@ -124,7 +123,18 @@ fn release_build() -> Result<(), Error> {
     Ok(())
 }
 
-fn tarball() -> Result<(), Error> {
+fn tarball(package: &Package) -> Result<(), Error> {
+    let path = format!("{}-{}-x86_64.tar.gz", package.name, package.version);
+    let binary = format!("target/release/{}", package.name);
+
+    fs::copy(binary, &package.name)?;
+    Command::new("tar")
+        .arg("czf")
+        .arg(path)
+        .arg(&package.name)
+        .status()?;
+    fs::remove_file(&package.name)?;
+
     Ok(())
 }
 
