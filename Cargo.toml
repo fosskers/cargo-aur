@@ -9,7 +9,7 @@ repository = "https://github.com/fosskers/cargo-aur"
 readme = "README.md"
 license = "MIT"
 keywords = ["cargo", "subcommand", "archlinux", "aur"]
-categories = ["cargo-plugins", "command-line-utilities"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 auto_from = "0.3"
