@@ -4,11 +4,6 @@ use serde_derive::Deserialize;
 use std::process::{self, Command};
 use std::{fmt, fs, io};
 
-// What it needs to do:
-// 1. Read Cargo.toml and produce PKGBUILD.
-// 2. Build a release binary if there isn't one.
-// 3. Tar the release binary and copy it to the project root.
-
 #[derive(Deserialize, Debug)]
 struct Config {
     package: Package,
@@ -23,6 +18,13 @@ struct Package {
     homepage: String,
     repository: String,
     license: String,
+}
+
+impl Package {
+    /// The name of the tarball that should be produced from this `Package`.
+    fn tarball(&self) -> String {
+        format!("{}-{}-x86_64.tar.gz", self.name, self.version)
+    }
 }
 
 #[derive(From)]
@@ -61,9 +63,9 @@ fn work() -> Result<(), Error> {
     let config = cargo_config()?;
     release_build()?;
     tarball(&config.package)?;
-    let md5 = md5sum()?;
+    let md5 = md5sum(&config.package)?;
     let pkgbuild = pkgbuild(&config.package, &md5);
-    println!("{}", pkgbuild);
+    fs::write("PKGBUILD", pkgbuild)?;
 
     Ok(())
 }
@@ -77,8 +79,7 @@ fn cargo_config() -> Result<Config, Error> {
 /// Produce a legal PKGBUILD.
 fn pkgbuild(package: &Package, md5: &str) -> String {
     format!(
-        r#"
-{}
+        r#"{}
 pkgname={}-bin
 pkgver={}
 pkgrel=1
@@ -124,13 +125,12 @@ fn release_build() -> Result<(), Error> {
 }
 
 fn tarball(package: &Package) -> Result<(), Error> {
-    let path = format!("{}-{}-x86_64.tar.gz", package.name, package.version);
     let binary = format!("target/release/{}", package.name);
 
     fs::copy(binary, &package.name)?;
     Command::new("tar")
         .arg("czf")
-        .arg(path)
+        .arg(package.tarball())
         .arg(&package.name)
         .status()?;
     fs::remove_file(&package.name)?;
@@ -138,6 +138,8 @@ fn tarball(package: &Package) -> Result<(), Error> {
     Ok(())
 }
 
-fn md5sum() -> Result<String, Error> {
-    Ok("dummy".to_string())
+fn md5sum(package: &Package) -> Result<String, Error> {
+    let bytes = fs::read(package.tarball())?;
+    let digest = md5::compute(bytes);
+    Ok(format!("{:x}", digest))
 }
