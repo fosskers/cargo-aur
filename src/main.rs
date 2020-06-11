@@ -1,6 +1,7 @@
 use auto_from::From;
 use itertools::Itertools;
 use serde_derive::Deserialize;
+use std::process::Command;
 use std::{fmt, fs, io, process};
 
 // What it needs to do:
@@ -25,7 +26,6 @@ struct Package {
     license: String,
 }
 
-#[auto_from]
 #[derive(From)]
 enum Error {
     Io(io::Error),
@@ -49,16 +49,24 @@ impl fmt::Display for Error {
 // }
 
 fn main() {
-    match cargo_config() {
+    match work() {
         Err(e) => {
             eprintln!("{}", e);
             process::exit(1)
         }
-        Ok(c) => {
-            let pkgbuild = pkgbuild(c.package);
-            println!("{}", pkgbuild)
-        }
+        Ok(_) => {}
     }
+}
+
+fn work() -> Result<(), Error> {
+    let config = cargo_config()?;
+    release_build()?;
+    tarball()?;
+    let md5 = md5sum()?;
+    let pkgbuild = pkgbuild(config.package, md5);
+    println!("{}", pkgbuild);
+
+    Ok(())
 }
 
 fn cargo_config() -> Result<Config, Error> {
@@ -68,7 +76,7 @@ fn cargo_config() -> Result<Config, Error> {
 }
 
 /// Produce a legal PKGBUILD.
-fn pkgbuild(package: Package) -> String {
+fn pkgbuild(package: Package, md5: String) -> String {
     format!(
         r#"
 {}
@@ -102,7 +110,24 @@ package() {{
         package.name,
         package.repository,
         package.name,
-        "Uh oh!",
+        md5,
         package.name,
     )
+}
+
+/// Run `cargo build --release`.
+fn release_build() -> Result<(), Error> {
+    Command::new("cargo")
+        .arg("build")
+        .arg("--release")
+        .status()?;
+    Ok(())
+}
+
+fn tarball() -> Result<(), Error> {
+    Ok(())
+}
+
+fn md5sum() -> Result<String, Error> {
+    Ok("dummy".to_string())
 }
