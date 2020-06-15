@@ -1,3 +1,4 @@
 /target
 deps.png
 pkg/
+Cargo.lock

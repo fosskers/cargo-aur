@@ -43,12 +43,9 @@ impl fmt::Display for Error {
 }
 
 fn main() {
-    match work() {
-        Err(e) => {
-            eprintln!("{}", e);
-            process::exit(1)
-        }
-        Ok(_) => {}
+    if let Err(e) = work() {
+        eprintln!("{}", e);
+        process::exit(1)
     }
 }
 
