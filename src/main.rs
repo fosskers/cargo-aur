@@ -1,4 +1,5 @@
 use auto_from::From;
+use hmac_sha256::Hash;
 use itertools::Itertools;
 use serde_derive::Deserialize;
 use std::process::{self, Command};
@@ -31,6 +32,7 @@ impl Package {
 enum Error {
     Io(io::Error),
     Parsing(toml::de::Error),
+    Utf8(std::string::FromUtf8Error),
 }
 
 impl fmt::Display for Error {
@@ -38,6 +40,7 @@ impl fmt::Display for Error {
         match self {
             Error::Io(e) => write!(f, "{}", e),
             Error::Parsing(e) => write!(f, "{}", e),
+            Error::Utf8(e) => write!(f, "{}", e),
         }
     }
 }
@@ -53,8 +56,8 @@ fn work() -> Result<(), Error> {
     let config = cargo_config()?;
     release_build()?;
     tarball(&config.package)?;
-    let md5 = md5sum(&config.package)?;
-    let pkgbuild = pkgbuild(&config.package, &md5);
+    let sha256 = sha256sum(&config.package)?;
+    let pkgbuild = pkgbuild(&config.package, &sha256);
     fs::write("PKGBUILD", pkgbuild)?;
 
     Ok(())
@@ -79,8 +82,8 @@ license=('{}')
 arch=('x86_64')
 provides=('{}')
 options=('strip')
-source=({}/releases/download/v$pkgver/{}-$pkgver-x86_64.tar.gz)
-md5sums=('{}')
+source=("{}/releases/download/v$pkgver/{}-$pkgver-x86_64.tar.gz")
+sha256sums=('{}')
 
 package() {{
     mkdir -p "$pkgdir/usr/bin/"
@@ -128,8 +131,9 @@ fn tarball(package: &Package) -> Result<(), Error> {
     Ok(())
 }
 
-fn md5sum(package: &Package) -> Result<String, Error> {
+fn sha256sum(package: &Package) -> Result<String, Error> {
     let bytes = fs::read(package.tarball())?;
-    let digest = md5::compute(bytes);
-    Ok(format!("{:x}", digest))
+    let digest = Hash::hash(&bytes);
+    let hex = digest.iter().map(|u| format!("{:x}", u)).collect();
+    Ok(hex)
 }
