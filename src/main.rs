@@ -86,8 +86,7 @@ source=("{}/releases/download/v$pkgver/{}-$pkgver-x86_64.tar.gz")
 sha256sums=('{}')
 
 package() {{
-    mkdir -p "$pkgdir/usr/bin/"
-    install -m 755 {} "$pkgdir/usr/bin/"
+    install -Dm755 {} -t "$pkgdir/usr/bin/"
 }}
 "#,
         package
@@ -134,6 +133,6 @@ fn tarball(package: &Package) -> Result<(), Error> {
 fn sha256sum(package: &Package) -> Result<String, Error> {
     let bytes = fs::read(package.tarball())?;
     let digest = Hash::hash(&bytes);
-    let hex = digest.iter().map(|u| format!("{:x}", u)).collect();
+    let hex = digest.iter().map(|u| format!("{:02x}", u)).collect();
     Ok(hex)
 }
