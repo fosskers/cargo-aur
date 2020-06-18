@@ -1,9 +1,40 @@
 use auto_from::From;
+use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
 use itertools::Itertools;
 use serde_derive::Deserialize;
 use std::process::{self, Command};
 use std::{fmt, fs, io};
+
+/// Prepare Rust projects to be released on the Arch Linux User Repository.
+#[derive(Options)]
+struct Args {
+    /// Print this help text.
+    help: bool,
+
+    /// Generate Gitlab source links instead.
+    gitlab: bool,
+}
+
+enum RepoMode {
+    Github,
+    Gitlab,
+}
+
+impl RepoMode {
+    fn source(&self, package: &Package) -> String {
+        match self {
+            RepoMode::Github => format!(
+                "{}/releases/download/v$pkgver/{}-$pkgver-x86_64.tar.gz",
+                package.repository, package.name
+            ),
+            RepoMode::Gitlab => format!(
+                "{}/-/archive/v$pkgver/{}-$pkgver-x86_64.tar.gz",
+                package.repository, package.name
+            ),
+        }
+    }
+}
 
 #[derive(Deserialize, Debug)]
 struct Config {
@@ -46,18 +77,26 @@ impl fmt::Display for Error {
 }
 
 fn main() {
-    if let Err(e) = work() {
+    let args = Args::parse_args_or_exit(ParsingStyle::AllOptions);
+
+    let mode = if args.gitlab {
+        RepoMode::Gitlab
+    } else {
+        RepoMode::Github
+    };
+
+    if let Err(e) = work(mode) {
         eprintln!("{}", e);
         process::exit(1)
     }
 }
 
-fn work() -> Result<(), Error> {
+fn work(mode: RepoMode) -> Result<(), Error> {
     let config = cargo_config()?;
     release_build()?;
     tarball(&config.package)?;
     let sha256 = sha256sum(&config.package)?;
-    let pkgbuild = pkgbuild(&config.package, &sha256);
+    let pkgbuild = pkgbuild(mode, &config.package, &sha256);
     fs::write("PKGBUILD", pkgbuild)?;
 
     Ok(())
@@ -70,7 +109,7 @@ fn cargo_config() -> Result<Config, Error> {
 }
 
 /// Produce a legal PKGBUILD.
-fn pkgbuild(package: &Package, md5: &str) -> String {
+fn pkgbuild(mode: RepoMode, package: &Package, sha256: &str) -> String {
     format!(
         r#"{}
 pkgname={}-bin
@@ -78,12 +117,12 @@ pkgver={}
 pkgrel=1
 pkgdesc="{}"
 url="{}"
-license=('{}')
-arch=('x86_64')
-provides=('{}')
-options=('strip')
-source=("{}/releases/download/v$pkgver/{}-$pkgver-x86_64.tar.gz")
-sha256sums=('{}')
+license=("{}")
+arch=("x86_64")
+provides=("{}")
+options=("strip")
+source=("{}")
+sha256sums=("{}")
 
 package() {{
     install -Dm755 {} -t "$pkgdir/usr/bin/"
@@ -100,9 +139,8 @@ package() {{
         package.homepage,
         package.license,
         package.name,
-        package.repository,
-        package.name,
-        md5,
+        mode.source(package),
+        sha256,
         package.name,
     )
 }
