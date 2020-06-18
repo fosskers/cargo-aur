@@ -1,34 +1,23 @@
 use auto_from::From;
-use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
 use itertools::Itertools;
 use serde_derive::Deserialize;
 use std::process::{self, Command};
 use std::{fmt, fs, io};
 
-/// Prepare Rust projects to be released on the Arch Linux User Repository.
-#[derive(Options)]
-struct Args {
-    /// Print this help text.
-    help: bool,
-
-    /// Generate Gitlab source links instead.
-    gitlab: bool,
-}
-
-enum RepoMode {
+enum GitHost {
     Github,
     Gitlab,
 }
 
-impl RepoMode {
+impl GitHost {
     fn source(&self, package: &Package) -> String {
         match self {
-            RepoMode::Github => format!(
+            GitHost::Github => format!(
                 "{}/releases/download/v$pkgver/{}-$pkgver-x86_64.tar.gz",
                 package.repository, package.name
             ),
-            RepoMode::Gitlab => format!(
+            GitHost::Gitlab => format!(
                 "{}/-/archive/v$pkgver/{}-$pkgver-x86_64.tar.gz",
                 package.repository, package.name
             ),
@@ -57,6 +46,16 @@ impl Package {
     fn tarball(&self) -> String {
         format!("{}-{}-x86_64.tar.gz", self.name, self.version)
     }
+
+    fn git_host(&self) -> Option<GitHost> {
+        if self.repository.starts_with("https://github") {
+            Some(GitHost::Github)
+        } else if self.repository.starts_with("https://gitlab") {
+            Some(GitHost::Gitlab)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(From)]
@@ -77,26 +76,18 @@ impl fmt::Display for Error {
 }
 
 fn main() {
-    let args = Args::parse_args_or_exit(ParsingStyle::AllOptions);
-
-    let mode = if args.gitlab {
-        RepoMode::Gitlab
-    } else {
-        RepoMode::Github
-    };
-
-    if let Err(e) = work(mode) {
+    if let Err(e) = work() {
         eprintln!("{}", e);
         process::exit(1)
     }
 }
 
-fn work(mode: RepoMode) -> Result<(), Error> {
+fn work() -> Result<(), Error> {
     let config = cargo_config()?;
     release_build()?;
     tarball(&config.package)?;
     let sha256 = sha256sum(&config.package)?;
-    let pkgbuild = pkgbuild(mode, &config.package, &sha256);
+    let pkgbuild = pkgbuild(&config.package, &sha256);
     fs::write("PKGBUILD", pkgbuild)?;
 
     Ok(())
@@ -109,7 +100,7 @@ fn cargo_config() -> Result<Config, Error> {
 }
 
 /// Produce a legal PKGBUILD.
-fn pkgbuild(mode: RepoMode, package: &Package, sha256: &str) -> String {
+fn pkgbuild(package: &Package, sha256: &str) -> String {
     format!(
         r#"{}
 pkgname={}-bin
@@ -139,7 +130,10 @@ package() {{
         package.homepage,
         package.license,
         package.name,
-        mode.source(package),
+        package
+            .git_host()
+            .unwrap_or(GitHost::Github)
+            .source(package),
         sha256,
         package.name,
     )
