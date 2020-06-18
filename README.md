@@ -14,7 +14,7 @@ a PKGBUILD will be generated with all the necessary sections filled out.
 ## Installation
 
 Guess what? `cargo-aur` itself is on the AUR! Install it with an AUR-compatible
-package manager:
+package manager like [`aura`](https://github.com/fosskers/aura):
 
 ```
 sudo aura -A cargo-aur-bin
@@ -52,8 +52,8 @@ AUR standard.
 
 At this point, it is up to you to:
 
-1. Create an official `Release` on Github, attaching the original binary tarball
-   that `cargo aur` produced.
+1. Create an official `Release` on Github/Gitlab, attaching the original binary
+   tarball that `cargo aur` produced.
 2. Copy the PKGBUILD to a git repo that tracks releases of your package.
 3. Run `makepkg --printsrcinfo > .SRCINFO`.
 4. Commit both files and push to the AUR.
