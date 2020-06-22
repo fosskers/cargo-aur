@@ -1,11 +1,12 @@
 # `cargo-aur` Changelog
 
-## Unreleased
+## 1.0.2 (2020-06-22)
 
 #### Changed
 
 - `cargo aur` will now auto-detect the git host (Github or Gitlab) and generated
   a `source` link based on that.
+- Fewer dependencies.
 
 ## 1.0.1 (2020-06-17)
 
