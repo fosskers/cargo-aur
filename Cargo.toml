@@ -12,7 +12,7 @@ keywords = ["cargo", "subcommand", "archlinux", "aur"]
 categories = ["command-line-utilities"]
 
 [dependencies]
-auto_from = "0.3"
+anyhow = "1.0"
 hmac-sha256 = "0.1"
 itertools = "0.9"
 serde = "1.0"

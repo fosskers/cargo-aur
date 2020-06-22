@@ -1,9 +1,8 @@
-use auto_from::From;
 use hmac_sha256::Hash;
 use itertools::Itertools;
 use serde_derive::Deserialize;
+use std::fs;
 use std::process::{self, Command};
-use std::{fmt, fs, io};
 
 enum GitHost {
     Github,
@@ -58,23 +57,6 @@ impl Package {
     }
 }
 
-#[derive(From)]
-enum Error {
-    Io(io::Error),
-    Parsing(toml::de::Error),
-    Utf8(std::string::FromUtf8Error),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Error::Io(e) => write!(f, "{}", e),
-            Error::Parsing(e) => write!(f, "{}", e),
-            Error::Utf8(e) => write!(f, "{}", e),
-        }
-    }
-}
-
 fn main() {
     if let Err(e) = work() {
         eprintln!("{}", e);
@@ -82,7 +64,7 @@ fn main() {
     }
 }
 
-fn work() -> Result<(), Error> {
+fn work() -> anyhow::Result<()> {
     let config = cargo_config()?;
     release_build()?;
     tarball(&config.package)?;
@@ -93,7 +75,7 @@ fn work() -> Result<(), Error> {
     Ok(())
 }
 
-fn cargo_config() -> Result<Config, Error> {
+fn cargo_config() -> anyhow::Result<Config> {
     let content = fs::read_to_string("Cargo.toml")?;
     let proj = toml::from_str(&content)?;
     Ok(proj) // TODO Would like to do this in one line with the above.
@@ -140,7 +122,7 @@ package() {{
 }
 
 /// Run `cargo build --release`.
-fn release_build() -> Result<(), Error> {
+fn release_build() -> anyhow::Result<()> {
     Command::new("cargo")
         .arg("build")
         .arg("--release")
@@ -148,7 +130,7 @@ fn release_build() -> Result<(), Error> {
     Ok(())
 }
 
-fn tarball(package: &Package) -> Result<(), Error> {
+fn tarball(package: &Package) -> anyhow::Result<()> {
     let binary = format!("target/release/{}", package.name);
 
     fs::copy(binary, &package.name)?;
@@ -162,7 +144,7 @@ fn tarball(package: &Package) -> Result<(), Error> {
     Ok(())
 }
 
-fn sha256sum(package: &Package) -> Result<String, Error> {
+fn sha256sum(package: &Package) -> anyhow::Result<String> {
     let bytes = fs::read(package.tarball())?;
     let digest = Hash::hash(&bytes);
     let hex = digest.iter().map(|u| format!("{:02x}", u)).collect();
