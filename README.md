@@ -2,6 +2,7 @@
 
 [![Build](https://github.com/fosskers/cargo-aur/workflows/Build/badge.svg)](https://github.com/fosskers/cargo-aur/actions)
 [![](https://img.shields.io/crates/v/cargo-aur.svg)](https://crates.io/crates/cargo-aur)
+![AUR version](https://img.shields.io/aur/version/cargo-aur-bin)
 
 `cargo-aur` is a new subcommand for `cargo` that produces a release tarball and
 PKGBUILD file for a Rust project, so that it can be released on the Arch Linux
