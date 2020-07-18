@@ -1,5 +1,11 @@
 # `cargo-aur` Changelog
 
+## 1.0.3 (2020-07-18)
+
+#### Changed
+
+- Better release profile which produces smaller binaries.
+
 ## 1.0.2 (2020-06-22)
 
 #### Changed
