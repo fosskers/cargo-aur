@@ -1,5 +1,12 @@
 # `cargo-aur` Changelog
 
+## 1.1.0 (2020-08-10)
+
+#### Added
+
+- The `--musl` flag to compile the release binary with the MUSL target. In most
+  cases, this will result in a fully statically linked binary.
+
 ## 1.0.3 (2020-07-18)
 
 #### Changed
