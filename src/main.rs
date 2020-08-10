@@ -1,8 +1,17 @@
+use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
 use itertools::Itertools;
 use serde_derive::Deserialize;
 use std::fs;
 use std::process::{self, Command};
+
+#[derive(Options)]
+struct Args {
+    help: bool,
+
+    /// Use the MUSL build target to produce a static binary.
+    musl: bool,
+}
 
 enum GitHost {
     Github,
@@ -58,16 +67,18 @@ impl Package {
 }
 
 fn main() {
-    if let Err(e) = work() {
+    let args = Args::parse_args_or_exit(ParsingStyle::AllOptions);
+
+    if let Err(e) = work(args) {
         eprintln!("{}", e);
         process::exit(1)
     }
 }
 
-fn work() -> anyhow::Result<()> {
+fn work(args: Args) -> anyhow::Result<()> {
     let config = cargo_config()?;
-    release_build()?;
-    tarball(&config.package)?;
+    release_build(args.musl)?;
+    tarball(args.musl, &config.package)?;
     let sha256 = sha256sum(&config.package)?;
     let pkgbuild = pkgbuild(&config.package, &sha256);
     fs::write("PKGBUILD", pkgbuild)?;
@@ -121,17 +132,24 @@ package() {{
     )
 }
 
-/// Run `cargo build --release`.
-fn release_build() -> anyhow::Result<()> {
-    Command::new("cargo")
-        .arg("build")
-        .arg("--release")
-        .status()?;
+/// Run `cargo build --release`, potentially building statically.
+fn release_build(musl: bool) -> anyhow::Result<()> {
+    let mut args = vec!["build", "--release"];
+
+    if musl {
+        args.push("--target=x86_64-unknown-linux-musl");
+    }
+
+    Command::new("cargo").args(args).status()?;
     Ok(())
 }
 
-fn tarball(package: &Package) -> anyhow::Result<()> {
-    let binary = format!("target/release/{}", package.name);
+fn tarball(musl: bool, package: &Package) -> anyhow::Result<()> {
+    let binary = if musl {
+        format!("target/x86_64-unknown-linux-musl/release/{}", package.name)
+    } else {
+        format!("target/release/{}", package.name)
+    };
 
     fs::copy(binary, &package.name)?;
     Command::new("tar")
