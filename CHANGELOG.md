@@ -1,5 +1,11 @@
 # `cargo-aur` Changelog
 
+## 1.1.1 (2020-08-11)
+
+#### Fixed
+
+- A breaking bug in `1.1.0` which prevented it from working at all.
+
 ## 1.1.0 (2020-08-10)
 
 #### Added

@@ -1,6 +1,6 @@
 [package]
 name = "cargo-aur"
-version = "1.1.0"
+version = "1.1.1"
 authors = ["Colin Woodbury <colin@fosskers.ca>"]
 edition = "2018"
 description = "Prepare Rust projects to be released on the Arch Linux User Repository."
