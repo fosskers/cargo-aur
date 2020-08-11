@@ -9,6 +9,9 @@ use std::process::{self, Command};
 struct Args {
     help: bool,
 
+    #[options(free)]
+    args: Vec<String>,
+
     /// Use the MUSL build target to produce a static binary.
     musl: bool,
 }
