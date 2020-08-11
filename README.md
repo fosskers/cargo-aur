@@ -61,3 +61,15 @@ At this point, it is up to you to:
 
 Some of these steps may be automated in `cargo aur` at a later date if there is
 sufficient demand.
+
+### Static Binaries
+
+Run with `--musl` to produce a release binary that is statically linked via
+[MUSL](https://musl.libc.org/).
+
+```
+> cargo aur --musl
+> cd target/x86_64-unknown-linux-musl/release/
+> ldd <your-binary>
+    not a dynamic executable
+```
