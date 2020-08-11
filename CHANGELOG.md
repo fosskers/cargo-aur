@@ -1,5 +1,11 @@
 # `cargo-aur` Changelog
 
+## Unreleased
+
+#### Changed
+
+- Run `strip` on the release binary before `tar`ring it.
+
 ## 1.1.1 (2020-08-11)
 
 #### Fixed

@@ -154,6 +154,7 @@ fn tarball(musl: bool, package: &Package) -> anyhow::Result<()> {
         format!("target/release/{}", package.name)
     };
 
+    strip(&binary)?;
     fs::copy(binary, &package.name)?;
     Command::new("tar")
         .arg("czf")
@@ -162,6 +163,13 @@ fn tarball(musl: bool, package: &Package) -> anyhow::Result<()> {
         .status()?;
     fs::remove_file(&package.name)?;
 
+    Ok(())
+}
+
+/// Strip the release binary, so that we aren't compressing more bytes than we
+/// need to.
+fn strip(path: &str) -> anyhow::Result<()> {
+    Command::new("strip").arg(path).status()?;
     Ok(())
 }
 
