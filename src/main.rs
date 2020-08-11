@@ -1,9 +1,11 @@
+use anyhow::anyhow;
 use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
 use itertools::Itertools;
 use serde_derive::Deserialize;
 use std::fs;
 use std::process::{self, Command};
+use std::str;
 
 #[derive(Options)]
 struct Args {
@@ -79,6 +81,12 @@ fn main() {
 }
 
 fn work(args: Args) -> anyhow::Result<()> {
+    // We can't proceed if the user has specified `--musl` but doesn't have the
+    // target installed.
+    if args.musl {
+        musl_check()?
+    }
+
     let config = cargo_config()?;
     release_build(args.musl)?;
     tarball(args.musl, &config.package)?;
@@ -178,4 +186,21 @@ fn sha256sum(package: &Package) -> anyhow::Result<String> {
     let digest = Hash::hash(&bytes);
     let hex = digest.iter().map(|u| format!("{:02x}", u)).collect();
     Ok(hex)
+}
+
+/// Does the user have the `x86_64-unknown-linux-musl` target installed?
+fn musl_check() -> anyhow::Result<()> {
+    let args = vec!["target", "list", "--installed"];
+    let output = Command::new("rustup").args(args).output()?.stdout;
+    let installed = str::from_utf8(&output)?
+        .lines()
+        .any(|tc| tc == "x86_64-unknown-linux-musl");
+
+    if installed {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "Missing target! Try: rustup target add x86_64-unknown-linux-musl"
+        ))
+    }
 }

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+#### Added
+
+- When using `--musl`, the user is warned if they don't have the
+  `x86_64-unknown-linux-musl` target installed.
+
 #### Changed
 
 - Run `strip` on the release binary before `tar`ring it.
