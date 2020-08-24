@@ -1,5 +1,11 @@
 # `cargo-aur` Changelog
 
+## 1.2.0 (2020-08-24)
+
+#### Added
+
+- A `--version` flag to display the current version of `cargo-aur`.
+
 ## 1.1.2 (2020-08-11)
 
 #### Added
