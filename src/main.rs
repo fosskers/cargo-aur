@@ -9,8 +9,13 @@ use std::str;
 
 #[derive(Options)]
 struct Args {
+    /// Display this help message.
     help: bool,
 
+    /// Display the current version of this software.
+    version: bool,
+
+    /// Unused.
     #[options(free)]
     args: Vec<String>,
 
@@ -74,7 +79,10 @@ impl Package {
 fn main() {
     let args = Args::parse_args_or_exit(ParsingStyle::AllOptions);
 
-    if let Err(e) = work(args) {
+    if args.version {
+        let version = env!("CARGO_PKG_VERSION");
+        println!("{}", version);
+    } else if let Err(e) = work(args) {
         eprintln!("{}", e);
         process::exit(1)
     }
