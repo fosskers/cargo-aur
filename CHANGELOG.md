@@ -1,5 +1,12 @@
 # `cargo-aur` Changelog
 
+## 1.3.0 (2021-04-05)
+
+#### Changed
+
+- `cargo aur` no longer outputs `options=("strip")`, since this is set by
+  default in `/etc/makepkg.conf`.
+
 ## 1.2.0 (2020-08-24)
 
 #### Added
