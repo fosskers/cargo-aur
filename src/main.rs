@@ -123,7 +123,6 @@ url="{}"
 license=("{}")
 arch=("x86_64")
 provides=("{}")
-options=("strip")
 source=("{}")
 sha256sums=("{}")
 
