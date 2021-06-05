@@ -1,4 +1,6 @@
-use anyhow::anyhow;
+pub(crate) mod error;
+
+use crate::error::Error;
 use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
 use itertools::Itertools;
@@ -88,7 +90,7 @@ fn main() {
     }
 }
 
-fn work(args: Args) -> anyhow::Result<()> {
+fn work(args: Args) -> Result<(), Error> {
     // We can't proceed if the user has specified `--musl` but doesn't have the
     // target installed.
     if args.musl {
@@ -105,7 +107,7 @@ fn work(args: Args) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn cargo_config() -> anyhow::Result<Config> {
+fn cargo_config() -> Result<Config, Error> {
     let content = fs::read_to_string("Cargo.toml")?;
     let proj = toml::from_str(&content)?;
     Ok(proj) // TODO Would like to do this in one line with the above.
@@ -151,7 +153,7 @@ package() {{
 }
 
 /// Run `cargo build --release`, potentially building statically.
-fn release_build(musl: bool) -> anyhow::Result<()> {
+fn release_build(musl: bool) -> Result<(), Error> {
     let mut args = vec!["build", "--release"];
 
     if musl {
@@ -162,7 +164,7 @@ fn release_build(musl: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn tarball(musl: bool, package: &Package) -> anyhow::Result<()> {
+fn tarball(musl: bool, package: &Package) -> Result<(), Error> {
     let binary = if musl {
         format!("target/x86_64-unknown-linux-musl/release/{}", package.name)
     } else {
@@ -183,12 +185,12 @@ fn tarball(musl: bool, package: &Package) -> anyhow::Result<()> {
 
 /// Strip the release binary, so that we aren't compressing more bytes than we
 /// need to.
-fn strip(path: &str) -> anyhow::Result<()> {
+fn strip(path: &str) -> Result<(), Error> {
     Command::new("strip").arg(path).status()?;
     Ok(())
 }
 
-fn sha256sum(package: &Package) -> anyhow::Result<String> {
+fn sha256sum(package: &Package) -> Result<String, Error> {
     let bytes = fs::read(package.tarball())?;
     let digest = Hash::hash(&bytes);
     let hex = digest.iter().map(|u| format!("{:02x}", u)).collect();
@@ -196,7 +198,7 @@ fn sha256sum(package: &Package) -> anyhow::Result<String> {
 }
 
 /// Does the user have the `x86_64-unknown-linux-musl` target installed?
-fn musl_check() -> anyhow::Result<()> {
+fn musl_check() -> Result<(), Error> {
     let args = vec!["target", "list", "--installed"];
     let output = Command::new("rustup").args(args).output()?.stdout;
     let installed = str::from_utf8(&output)?
@@ -206,8 +208,6 @@ fn musl_check() -> anyhow::Result<()> {
     if installed {
         Ok(())
     } else {
-        Err(anyhow!(
-            "Missing target! Try: rustup target add x86_64-unknown-linux-musl"
-        ))
+        Err(Error::MissingTarget)
     }
 }
