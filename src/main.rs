@@ -6,6 +6,7 @@ use hmac_sha256::Hash;
 use itertools::Itertools;
 use serde_derive::Deserialize;
 use std::fs;
+use std::path::Path;
 use std::process::{self, Command};
 use std::str;
 
@@ -97,20 +98,28 @@ fn work(args: Args) -> Result<(), Error> {
         musl_check()?
     }
 
-    let config = cargo_config()?;
+    let package = cargo_config()?;
+    license_check()?;
     release_build(args.musl)?;
-    tarball(args.musl, &config.package)?;
-    let sha256 = sha256sum(&config.package)?;
-    let pkgbuild = pkgbuild(&config.package, &sha256);
+    tarball(args.musl, &package)?;
+    let sha256 = sha256sum(&package)?;
+    let pkgbuild = pkgbuild(&package, &sha256);
     fs::write("PKGBUILD", pkgbuild)?;
 
     Ok(())
 }
 
-fn cargo_config() -> Result<Config, Error> {
+fn cargo_config() -> Result<Package, Error> {
     let content = fs::read_to_string("Cargo.toml")?;
-    let proj = toml::from_str(&content)?;
-    Ok(proj) // TODO Would like to do this in one line with the above.
+    let proj: Config = toml::from_str(&content)?;
+    Ok(proj.package)
+}
+
+fn license_check() -> Result<(), Error> {
+    Path::new("LICENSE")
+        .exists()
+        .then(|| ())
+        .ok_or(Error::MissingLicense)
 }
 
 /// Produce a legal PKGBUILD.
