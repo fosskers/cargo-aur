@@ -125,6 +125,7 @@ url="{}"
 license=("{}")
 arch=("x86_64")
 provides=("{}")
+conflicts=("{}")
 source=("{}")
 sha256sums=("{}")
 
@@ -142,6 +143,7 @@ package() {{
         package.description,
         package.homepage,
         package.license,
+        package.name,
         package.name,
         package
             .git_host()
@@ -187,7 +189,7 @@ fn tarball(musl: bool, package: &Package) -> Result<(), Error> {
 /// need to.
 fn strip(path: &str) -> Result<(), Error> {
     Command::new("strip").arg(path).status()?;
-    Ok(())
+    Ok(()) // FIXME Would love to use my `void` package here and elsewhere.
 }
 
 fn sha256sum(package: &Package) -> Result<String, Error> {
