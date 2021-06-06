@@ -6,10 +6,18 @@ use hmac_sha256::Hash;
 use itertools::Itertools;
 use serde_derive::Deserialize;
 use std::fs;
-use std::path::Path;
-use std::path::PathBuf;
-use std::process::{self, Command};
+use std::ops::Not;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::str;
+
+/// Licenses avaiable from the Arch Linux `licenses`.
+///
+/// That package contains other licenses, but I've excluded here those unlikely
+/// to be used by Rust crates.
+const LICENSES: &[&str] = &[
+    "AGPL3", "APACHE", "GPL2", "GPL3", "LGPL2.1", "LGPL3", "MPL", "MPL2",
+];
 
 #[derive(Options)]
 struct Args {
@@ -88,7 +96,7 @@ fn main() {
         println!("{}", version);
     } else if let Err(e) = work(args) {
         eprintln!("{}", e);
-        process::exit(1)
+        std::process::exit(1)
     }
 }
 
@@ -100,7 +108,11 @@ fn work(args: Args) -> Result<(), Error> {
     }
 
     let package = cargo_config()?;
-    let license = license()?;
+    let license = if must_copy_license(&package.license) {
+        license_file()?
+    } else {
+        None
+    };
     release_build(args.musl)?;
     tarball(args.musl, license.as_deref(), &package)?;
     let sha256 = sha256sum(&package)?;
@@ -116,7 +128,14 @@ fn cargo_config() -> Result<Package, Error> {
     Ok(proj.package)
 }
 
-fn license() -> Result<Option<PathBuf>, std::io::Error> {
+/// If a AUR package's license isn't included in `/usr/share/licenses/common/`,
+/// then it must be installed manually by the PKGBUILD. MIT is such a missing
+/// license, and since many Rust crates use MIT we must make this check.
+fn must_copy_license(license: &str) -> bool {
+    LICENSES.contains(&license).not()
+}
+
+fn license_file() -> Result<Option<PathBuf>, std::io::Error> {
     let path = std::fs::read_dir(".")?
         .filter_map(|entry| entry.ok())
         .find(|entry| {
