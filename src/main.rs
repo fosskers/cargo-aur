@@ -1,6 +1,7 @@
 pub(crate) mod error;
 
 use crate::error::Error;
+use colored::*;
 use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
 use itertools::Itertools;
@@ -95,8 +96,10 @@ fn main() {
         let version = env!("CARGO_PKG_VERSION");
         println!("{}", version);
     } else if let Err(e) = work(args) {
-        eprintln!("{}", e);
+        eprintln!("{} {}: {}", "::".bold(), "Error".bold().red(), e);
         std::process::exit(1)
+    } else {
+        println!("{} {}", "::".bold(), "Done.".bold().green());
     }
 }
 
@@ -104,11 +107,13 @@ fn work(args: Args) -> Result<(), Error> {
     // We can't proceed if the user has specified `--musl` but doesn't have the
     // target installed.
     if args.musl {
+        p("Checking for musl toolchain...".bold());
         musl_check()?
     }
 
     let package = cargo_config()?;
     let license = if must_copy_license(&package.license) {
+        p("LICENSE file will be installed manually.".bold().yellow());
         license_file()?
     } else {
         None
@@ -199,6 +204,7 @@ fn release_build(musl: bool) -> Result<(), Error> {
         args.push("--target=x86_64-unknown-linux-musl");
     }
 
+    p("Running release build...".bold());
     Command::new("cargo").args(args).status()?;
     Ok(())
 }
@@ -214,6 +220,7 @@ fn tarball(musl: bool, license: Option<&Path>, package: &Package) -> Result<(), 
     fs::copy(binary, &package.name)?;
 
     // Create the tarball.
+    p("Packing tarball...".bold());
     let mut command = Command::new("tar");
     command.arg("czf").arg(package.tarball()).arg(&package.name);
     if let Some(lic) = license {
@@ -229,6 +236,7 @@ fn tarball(musl: bool, license: Option<&Path>, package: &Package) -> Result<(), 
 /// Strip the release binary, so that we aren't compressing more bytes than we
 /// need to.
 fn strip(path: &str) -> Result<(), Error> {
+    p("Stripping binary...".bold());
     Command::new("strip").arg(path).status()?;
     Ok(()) // FIXME Would love to use my `void` package here and elsewhere.
 }
@@ -253,4 +261,8 @@ fn musl_check() -> Result<(), Error> {
     } else {
         Err(Error::MissingTarget)
     }
+}
+
+fn p(msg: ColoredString) {
+    println!("{} {}", "::".bold(), msg)
 }
