@@ -7,6 +7,7 @@ use itertools::Itertools;
 use serde_derive::Deserialize;
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::{self, Command};
 use std::str;
 
@@ -99,9 +100,9 @@ fn work(args: Args) -> Result<(), Error> {
     }
 
     let package = cargo_config()?;
-    license_check()?;
+    let license = license()?;
     release_build(args.musl)?;
-    tarball(args.musl, &package)?;
+    tarball(args.musl, license.as_deref(), &package)?;
     let sha256 = sha256sum(&package)?;
     let pkgbuild = pkgbuild(&package, &sha256);
     fs::write("PKGBUILD", pkgbuild)?;
@@ -115,11 +116,19 @@ fn cargo_config() -> Result<Package, Error> {
     Ok(proj.package)
 }
 
-fn license_check() -> Result<(), Error> {
-    Path::new("LICENSE")
-        .exists()
-        .then(|| ())
-        .ok_or(Error::MissingLicense)
+fn license() -> Result<Option<PathBuf>, std::io::Error> {
+    let path = std::fs::read_dir(".")?
+        .filter_map(|entry| entry.ok())
+        .find(|entry| {
+            entry
+                .file_name()
+                .to_str()
+                .map(|s| s.starts_with("LICENSE"))
+                .unwrap_or(false)
+        })
+        .map(|entry| entry.path());
+
+    Ok(path)
 }
 
 /// Produce a legal PKGBUILD.
@@ -175,7 +184,7 @@ fn release_build(musl: bool) -> Result<(), Error> {
     Ok(())
 }
 
-fn tarball(musl: bool, package: &Package) -> Result<(), Error> {
+fn tarball(musl: bool, license: Option<&Path>, package: &Package) -> Result<(), Error> {
     let binary = if musl {
         format!("target/x86_64-unknown-linux-musl/release/{}", package.name)
     } else {
@@ -184,11 +193,15 @@ fn tarball(musl: bool, package: &Package) -> Result<(), Error> {
 
     strip(&binary)?;
     fs::copy(binary, &package.name)?;
-    Command::new("tar")
-        .arg("czf")
-        .arg(package.tarball())
-        .arg(&package.name)
-        .status()?;
+
+    // Create the tarball.
+    let mut command = Command::new("tar");
+    command.arg("czf").arg(package.tarball()).arg(&package.name);
+    if let Some(lic) = license {
+        command.arg(lic);
+    }
+    command.status()?;
+
     fs::remove_file(&package.name)?;
 
     Ok(())

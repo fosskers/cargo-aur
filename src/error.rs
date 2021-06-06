@@ -7,7 +7,6 @@ pub(crate) enum Error {
     Toml(toml::de::Error),
     Utf8(std::str::Utf8Error),
     MissingTarget,
-    MissingLicense,
 }
 
 impl Display for Error {
@@ -20,9 +19,6 @@ impl Display for Error {
                 f,
                 "Missing target! Try: rustup target add x86_64-unknown-linux-musl"
             ),
-            Error::MissingLicense => {
-                write!(f, "Missing LICENSE file. See https://choosealicense.com/")
-            }
         }
     }
 }
