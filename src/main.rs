@@ -114,7 +114,7 @@ fn work(args: Args) -> Result<(), Error> {
     let package = cargo_config()?;
     let license = if must_copy_license(&package.license) {
         p("LICENSE file will be installed manually.".bold().yellow());
-        license_file()?
+        Some(license_file()?)
     } else {
         None
     };
@@ -140,8 +140,9 @@ fn must_copy_license(license: &str) -> bool {
     LICENSES.contains(&license).not()
 }
 
-fn license_file() -> Result<Option<PathBuf>, std::io::Error> {
-    let path = std::fs::read_dir(".")?
+/// The path to the `LICENSE` file.
+fn license_file() -> Result<PathBuf, Error> {
+    std::fs::read_dir(".")?
         .filter_map(|entry| entry.ok())
         .find(|entry| {
             entry
@@ -150,9 +151,8 @@ fn license_file() -> Result<Option<PathBuf>, std::io::Error> {
                 .map(|s| s.starts_with("LICENSE"))
                 .unwrap_or(false)
         })
-        .map(|entry| entry.path());
-
-    Ok(path)
+        .map(|entry| entry.path())
+        .ok_or(Error::MissingLicense)
 }
 
 /// Produce a legal PKGBUILD.
