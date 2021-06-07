@@ -6,6 +6,7 @@ pub(crate) enum Error {
     IO(std::io::Error),
     Toml(toml::de::Error),
     Utf8(std::str::Utf8Error),
+    Utf8OsString,
     MissingTarget,
     MissingLicense,
 }
@@ -16,6 +17,7 @@ impl Display for Error {
             Error::IO(e) => write!(f, "{}", e),
             Error::Toml(e) => write!(f, "{}", e),
             Error::Utf8(e) => write!(f, "{}", e),
+            Error::Utf8OsString => write!(f, "The `OsString` was not UTF-8!"),
             Error::MissingTarget => write!(
                 f,
                 "Missing target! Try: rustup target add x86_64-unknown-linux-musl"

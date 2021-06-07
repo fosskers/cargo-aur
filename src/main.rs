@@ -6,11 +6,10 @@ use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
 use itertools::Itertools;
 use serde_derive::Deserialize;
-use std::fs;
+use std::fs::{DirEntry, File};
+use std::io::{BufWriter, Write};
 use std::ops::Not;
-use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::str;
 
 /// Licenses avaiable from the Arch Linux `licenses`.
 ///
@@ -119,16 +118,19 @@ fn work(args: Args) -> Result<(), Error> {
         None
     };
     release_build(args.musl)?;
-    tarball(args.musl, license.as_deref(), &package)?;
-    let sha256 = sha256sum(&package)?;
-    let pkgbuild = pkgbuild(&package, &sha256);
-    fs::write("PKGBUILD", pkgbuild)?;
+    tarball(args.musl, license.as_ref(), &package)?;
+    let sha256: String = sha256sum(&package)?;
+
+    // Write the PKGBUILD.
+    let file = BufWriter::new(File::create("PKGBUILD")?);
+    pkgbuild(file, &package, &sha256, license.as_ref())?;
+    // fs::write("PKGBUILD", pkgbuild)?;
 
     Ok(())
 }
 
 fn cargo_config() -> Result<Package, Error> {
-    let content = fs::read_to_string("Cargo.toml")?;
+    let content = std::fs::read_to_string("Cargo.toml")?;
     let proj: Config = toml::from_str(&content)?;
     Ok(proj.package)
 }
@@ -141,7 +143,7 @@ fn must_copy_license(license: &str) -> bool {
 }
 
 /// The path to the `LICENSE` file.
-fn license_file() -> Result<PathBuf, Error> {
+fn license_file() -> Result<DirEntry, Error> {
     std::fs::read_dir(".")?
         .filter_map(|entry| entry.ok())
         .find(|entry| {
@@ -151,49 +153,60 @@ fn license_file() -> Result<PathBuf, Error> {
                 .map(|s| s.starts_with("LICENSE"))
                 .unwrap_or(false)
         })
-        .map(|entry| entry.path())
         .ok_or(Error::MissingLicense)
 }
 
 /// Produce a legal PKGBUILD.
-fn pkgbuild(package: &Package, sha256: &str) -> String {
-    format!(
-        r#"{}
-pkgname={}-bin
-pkgver={}
-pkgrel=1
-pkgdesc="{}"
-url="{}"
-license=("{}")
-arch=("x86_64")
-provides=("{}")
-conflicts=("{}")
-source=("{}")
-sha256sums=("{}")
+fn pkgbuild<T: Write>(
+    mut file: T,
+    package: &Package,
+    sha256: &str,
+    license: Option<&DirEntry>,
+) -> Result<(), Error> {
+    let authors = package
+        .authors
+        .iter()
+        .map(|a| format!("# Maintainer: {}", a))
+        .join("\n");
+    let source = package
+        .git_host()
+        .unwrap_or(GitHost::Github)
+        .source(package);
 
-package() {{
-    install -Dm755 {} -t "$pkgdir/usr/bin/"
-}}
-"#,
-        package
-            .authors
-            .iter()
-            .map(|a| format!("# Maintainer: {}", a))
-            .join("\n"),
-        package.name,
-        package.version,
-        package.description,
-        package.homepage,
-        package.license,
-        package.name,
-        package.name,
-        package
-            .git_host()
-            .unwrap_or(GitHost::Github)
-            .source(package),
-        sha256,
-        package.name,
-    )
+    writeln!(file, "{}", authors)?;
+    writeln!(file, "pkgname={}-bin", package.name)?;
+    writeln!(file, "pkgver={}", package.version)?;
+    writeln!(file, "pkgrel=1")?;
+    writeln!(file, "pkgdesc=\"{}\"", package.description)?;
+    writeln!(file, "url=\"{}\"", package.homepage)?;
+    writeln!(file, "license=(\"{}\")", package.license)?;
+    writeln!(file, "arch=(\"x86_64\")")?;
+    writeln!(file, "provides=(\"{}\")", package.name)?;
+    writeln!(file, "conflicts=(\"{}\")", package.name)?;
+    writeln!(file, "source=(\"{}\")", source)?;
+    writeln!(file, "sha256sums=(\"{}\")", sha256)?;
+    writeln!(file)?;
+    writeln!(file, "package() {{")?;
+    writeln!(
+        file,
+        "    install -Dm755 {} -t \"$pkgdir/usr/bin\"",
+        package.name
+    )?;
+
+    if let Some(lic) = license {
+        let file_name = lic
+            .file_name()
+            .into_string()
+            .map_err(|_| Error::Utf8OsString)?;
+        writeln!(
+            file,
+            "    install -Dm644 {} \"$pkgdir/usr/share/licenses/$pkgname/{}\"",
+            file_name, file_name
+        )?;
+    }
+
+    writeln!(file, "}}")?;
+    Ok(())
 }
 
 /// Run `cargo build --release`, potentially building statically.
@@ -209,7 +222,7 @@ fn release_build(musl: bool) -> Result<(), Error> {
     Ok(())
 }
 
-fn tarball(musl: bool, license: Option<&Path>, package: &Package) -> Result<(), Error> {
+fn tarball(musl: bool, license: Option<&DirEntry>, package: &Package) -> Result<(), Error> {
     let binary = if musl {
         format!("target/x86_64-unknown-linux-musl/release/{}", package.name)
     } else {
@@ -217,18 +230,18 @@ fn tarball(musl: bool, license: Option<&Path>, package: &Package) -> Result<(), 
     };
 
     strip(&binary)?;
-    fs::copy(binary, &package.name)?;
+    std::fs::copy(binary, &package.name)?;
 
     // Create the tarball.
     p("Packing tarball...".bold());
     let mut command = Command::new("tar");
     command.arg("czf").arg(package.tarball()).arg(&package.name);
     if let Some(lic) = license {
-        command.arg(lic);
+        command.arg(lic.path());
     }
     command.status()?;
 
-    fs::remove_file(&package.name)?;
+    std::fs::remove_file(&package.name)?;
 
     Ok(())
 }
@@ -242,7 +255,7 @@ fn strip(path: &str) -> Result<(), Error> {
 }
 
 fn sha256sum(package: &Package) -> Result<String, Error> {
-    let bytes = fs::read(package.tarball())?;
+    let bytes = std::fs::read(package.tarball())?;
     let digest = Hash::hash(&bytes);
     let hex = digest.iter().map(|u| format!("{:02x}", u)).collect();
     Ok(hex)
@@ -252,7 +265,7 @@ fn sha256sum(package: &Package) -> Result<String, Error> {
 fn musl_check() -> Result<(), Error> {
     let args = vec!["target", "list", "--installed"];
     let output = Command::new("rustup").args(args).output()?.stdout;
-    let installed = str::from_utf8(&output)?
+    let installed = std::str::from_utf8(&output)?
         .lines()
         .any(|tc| tc == "x86_64-unknown-linux-musl");
 
