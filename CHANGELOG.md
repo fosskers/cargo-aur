@@ -1,5 +1,16 @@
 # `cargo-aur` Changelog
 
+## 1.4.0 (2021-06-07)
+
+#### Added
+
+- The `conflicts` field is now added to the `PKGBUILD`.
+- Progress messages in the terminal.
+- `LICENSE` detection and installation. If your Rust crate has a license not
+  found in `/usr/share/licenses/common/` (like `MIT`), then `cargo aur` will
+  copy it into the source tarball and have the PKGBUILD install it. Naturally
+  this means you must actually have a `LICENSE` file in your project, or `cargo aur` will complain.
+
 ## 1.3.0 (2021-04-05)
 
 #### Changed
