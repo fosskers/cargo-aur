@@ -11,7 +11,7 @@ use std::io::{BufWriter, Write};
 use std::ops::Not;
 use std::process::Command;
 
-/// Licenses avaiable from the Arch Linux `licenses`.
+/// Licenses avaiable from the Arch Linux `licenses` package.
 ///
 /// That package contains other licenses, but I've excluded here those unlikely
 /// to be used by Rust crates.
@@ -124,7 +124,6 @@ fn work(args: Args) -> Result<(), Error> {
     // Write the PKGBUILD.
     let file = BufWriter::new(File::create("PKGBUILD")?);
     pkgbuild(file, &package, &sha256, license.as_ref())?;
-    // fs::write("PKGBUILD", pkgbuild)?;
 
     Ok(())
 }
@@ -156,7 +155,7 @@ fn license_file() -> Result<DirEntry, Error> {
         .ok_or(Error::MissingLicense)
 }
 
-/// Produce a legal PKGBUILD.
+/// Write a legal PKGBUILD to some `Write` instance (a `File` in this case).
 fn pkgbuild<T: Write>(
     mut file: T,
     package: &Package,
