@@ -6,9 +6,11 @@ use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
 use itertools::Itertools;
 use serde_derive::Deserialize;
+use std::ffi::OsString;
 use std::fs::{DirEntry, File};
 use std::io::{BufWriter, Write};
 use std::ops::Not;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Licenses avaiable from the Arch Linux `licenses` package.
@@ -228,11 +230,20 @@ fn release_build(musl: bool) -> Result<(), Error> {
 }
 
 fn tarball(musl: bool, license: Option<&DirEntry>, package: &Package) -> Result<(), Error> {
-    let binary = if musl {
-        format!("target/x86_64-unknown-linux-musl/release/{}", package.name)
-    } else {
-        format!("target/release/{}", package.name)
+    let target_dir: OsString = match std::env::var_os("CARGO_TARGET_DIR") {
+        Some(p) => p,
+        None => "target".into(),
     };
+
+    let release_dir = if musl {
+        "x86_64-unknown-linux-musl/release"
+    } else {
+        "release"
+    };
+
+    let mut binary: PathBuf = (target_dir).into();
+    binary.push(release_dir);
+    binary.push(&package.name);
 
     strip(&binary)?;
     std::fs::copy(binary, &package.name)?;
@@ -253,7 +264,7 @@ fn tarball(musl: bool, license: Option<&DirEntry>, package: &Package) -> Result<
 
 /// Strip the release binary, so that we aren't compressing more bytes than we
 /// need to.
-fn strip(path: &str) -> Result<(), Error> {
+fn strip(path: &Path) -> Result<(), Error> {
     p("Stripping binary...".bold());
     Command::new("strip").arg(path).status()?;
     Ok(()) // FIXME Would love to use my `void` package here and elsewhere.
