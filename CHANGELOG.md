@@ -1,5 +1,13 @@
 # `cargo-aur` Changelog
 
+## 1.4.1 (2021-09-06)
+
+#### Fixed
+
+- `cargo aur` now respects `CARGO_TARGET_DIR`. [#6]
+
+[#6]: https://github.com/fosskers/cargo-aur/pull/6
+
 ## 1.4.0 (2021-06-07)
 
 #### Added

@@ -241,7 +241,7 @@ fn tarball(musl: bool, license: Option<&DirEntry>, package: &Package) -> Result<
         "release"
     };
 
-    let mut binary: PathBuf = (target_dir).into();
+    let mut binary: PathBuf = target_dir.into();
     binary.push(release_dir);
     binary.push(&package.name);
 
