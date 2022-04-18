@@ -71,6 +71,8 @@ struct Package {
     homepage: String,
     repository: String,
     license: String,
+    depends: Option<Vec<String>>,
+    optdepends: Option<Vec<String>>
 }
 
 impl Package {
@@ -174,6 +176,26 @@ fn pkgbuild<T: Write>(
         .unwrap_or(GitHost::Github)
         .source(package);
 
+    let depends = match &package.depends {
+        Some(dep) => dep
+                        .iter()
+                        .map(|a| format!("\"{}\"", a))
+                        .join(" "),
+        
+        None => String::from("")
+    };
+        
+   
+    
+    let optdepends = match &package.optdepends {
+        Some(dep) => dep
+                        .iter()
+                        .map(|a| format!("\"{}\"", a))
+                        .join(" "),
+        
+        None => String::from("")
+    };
+    
     writeln!(file, "{}", authors)?;
     writeln!(file, "#")?;
     writeln!(
@@ -190,6 +212,8 @@ fn pkgbuild<T: Write>(
     writeln!(file, "arch=(\"x86_64\")")?;
     writeln!(file, "provides=(\"{}\")", package.name)?;
     writeln!(file, "conflicts=(\"{}\")", package.name)?;
+    writeln!(file, "depends=({})", depends)?;
+    writeln!(file, "optdepends=({})", optdepends)?;
     writeln!(file, "source=(\"{}\")", source)?;
     writeln!(file, "sha256sums=(\"{}\")", sha256)?;
     writeln!(file)?;
