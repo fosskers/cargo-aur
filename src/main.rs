@@ -86,6 +86,11 @@ struct Package {
     homepage: String,
     repository: String,
     license: String,
+    metadata: Option<Metadata>
+}
+
+#[derive(Deserialize, Debug)]
+struct Metadata {
     depends: Option<Vec<String>>,
     optdepends: Option<Vec<String>>
 }
@@ -200,24 +205,42 @@ fn pkgbuild<T: Write>(
         .unwrap_or(GitHost::Github)
         .source(&config.package);
 
-    let depends = match &package.depends {
-        Some(dep) => dep
-                        .iter()
-                        .map(|a| format!("\"{}\"", a))
-                        .join(" "),
-        
-        None => String::from("")
-    };
-        
-   
+    // Handle optional table [package.metadata]
+    // They default to "" if the table is not present
+    let depends: String; 
+    let optdepends: String;
     
-    let optdepends = match &package.optdepends {
-        Some(dep) => dep
-                        .iter()
-                        .map(|a| format!("\"{}\"", a))
-                        .join(" "),
-        
-        None => String::from("")
+    match &package.metadata {
+        Some(metadata) => {  // If the table [package.metadata] is present
+
+            depends = match &metadata.depends {
+                // And depends is present
+                Some(dep) => dep
+                                .iter()
+                                .map(|a| format!("\"{}\"", a))
+                                .join(" "),
+
+                // Otherwise, set to default
+                None => String::from("")
+            };
+    
+            optdepends = match &metadata.optdepends {
+                // And optdepends is present
+                Some(dep) => dep
+                                .iter()
+                                .map(|a| format!("\"{}\"", a))
+                                .join(" "),
+                                
+                // Otherwise, set to default
+                None => String::from("")
+            };
+        },
+
+        // Otherwise, set to default
+        None => {
+            depends = String::from("");
+            optdepends = String::from("");
+        }
     };
     
     writeln!(file, "{}", authors)?;
