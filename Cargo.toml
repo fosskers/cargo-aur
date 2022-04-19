@@ -2,7 +2,7 @@
 name = "cargo-aur"
 version = "1.4.1"
 authors = ["Colin Woodbury <colin@fosskers.ca>"]
-edition = "2018"
+edition = "2021"
 description = "Prepare Rust projects to be released on the Arch Linux User Repository."
 homepage = "https://github.com/fosskers/cargo-aur"
 repository = "https://github.com/fosskers/cargo-aur"
@@ -14,7 +14,7 @@ categories = ["command-line-utilities"]
 [dependencies]
 colored = "2.0"
 gumdrop = "0.8"
-hmac-sha256 = "0.1"
+hmac-sha256 = "1.1"
 itertools = "0.10"
 serde = "1.0"
 serde_derive = "1.0"
@@ -22,3 +22,4 @@ toml = "0.5"
 
 [profile.release]
 lto = true
+strip = true
