@@ -63,6 +63,7 @@ impl GitHost {
 #[derive(Deserialize, Debug)]
 struct Config {
     package: Package,
+    #[serde(default)]
     bin: Vec<Binary>,
 }
 
