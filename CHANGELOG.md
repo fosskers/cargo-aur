@@ -1,5 +1,14 @@
 # `cargo-aur` Changelog
 
+## Unreleased
+
+#### Added
+
+- Support for `[[bin]]` sections in `Cargo.toml`, allowing you to specify custom
+  binary names separate from the package name. [#13]
+
+[#13]: https://github.com/fosskers/cargo-aur/pull/13
+
 ## 1.4.1 (2021-09-06)
 
 #### Fixed
