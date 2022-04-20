@@ -86,13 +86,47 @@ struct Package {
     homepage: String,
     repository: String,
     license: String,
-    metadata: Option<Metadata>
+    metadata: Option<Metadata>,
 }
 
 #[derive(Deserialize, Debug)]
 struct Metadata {
-    depends: Option<Vec<String>>,
-    optdepends: Option<Vec<String>>
+    #[serde(default)]
+    depends: Vec<String>,
+    #[serde(default)]
+    optdepends: Vec<String>,
+}
+
+impl std::fmt::Display for Metadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.depends.as_slice() {
+            [middle @ .., last] => {
+                write!(f, "depends=(")?;
+                for item in middle {
+                    write!(f, "\"{}\" ", item)?;
+                }
+                if self.optdepends.is_empty().not() {
+                    writeln!(f, "\"{}\")", last)?;
+                } else {
+                    write!(f, "\"{}\")", last)?;
+                }
+            }
+            [] => {}
+        }
+
+        match self.optdepends.as_slice() {
+            [middle @ .., last] => {
+                write!(f, "optdepends=(")?;
+                for item in middle {
+                    write!(f, "\"{}\" ", item)?;
+                }
+                write!(f, "\"{}\")", last)?;
+            }
+            [] => {}
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -205,44 +239,6 @@ fn pkgbuild<T: Write>(
         .unwrap_or(GitHost::Github)
         .source(&config.package);
 
-    // Handle optional table [package.metadata]
-    // They default to "" if the table is not present
-    let depends: String; 
-    let optdepends: String;
-    
-    match &package.metadata {
-        Some(metadata) => {  // If the table [package.metadata] is present
-
-            depends = match &metadata.depends {
-                // And depends is present
-                Some(dep) => dep
-                                .iter()
-                                .map(|a| format!("\"{}\"", a))
-                                .join(" "),
-
-                // Otherwise, set to default
-                None => String::from("")
-            };
-    
-            optdepends = match &metadata.optdepends {
-                // And optdepends is present
-                Some(dep) => dep
-                                .iter()
-                                .map(|a| format!("\"{}\"", a))
-                                .join(" "),
-                                
-                // Otherwise, set to default
-                None => String::from("")
-            };
-        },
-
-        // Otherwise, set to default
-        None => {
-            depends = String::from("");
-            optdepends = String::from("");
-        }
-    };
-    
     writeln!(file, "{}", authors)?;
     writeln!(file, "#")?;
     writeln!(
@@ -259,8 +255,11 @@ fn pkgbuild<T: Write>(
     writeln!(file, "arch=(\"x86_64\")")?;
     writeln!(file, "provides=(\"{}\")", package.name)?;
     writeln!(file, "conflicts=(\"{}\")", package.name)?;
-    writeln!(file, "depends=({})", depends)?;
-    writeln!(file, "optdepends=({})", optdepends)?;
+
+    if let Some(metadata) = package.metadata.as_ref() {
+        writeln!(file, "{}", metadata)?;
+    }
+
     writeln!(file, "source=(\"{}\")", source)?;
     writeln!(file, "sha256sums=(\"{}\")", sha256)?;
     writeln!(file)?;
