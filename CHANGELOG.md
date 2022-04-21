@@ -6,6 +6,14 @@
 
 - Support for `[[bin]]` sections in `Cargo.toml`, allowing you to specify custom
   binary names separate from the package name. [#13]
+- Support for specifying PKGBUILD `depends` and `optdepends` via
+  `[package.metadata]`, as in:
+
+```toml
+[package.metadata]
+depends = ["nachos", "pizza"]
+optdepends = ["sushi", "ramen"]
+```
 
 [#13]: https://github.com/fosskers/cargo-aur/pull/13
 
