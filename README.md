@@ -29,6 +29,8 @@ cargo install cargo-aur
 
 ## Usage
 
+### Basics
+
 Navigate to a Rust project, and run:
 
 ```
@@ -61,6 +63,24 @@ At this point, it is up to you to:
 
 Some of these steps may be automated in `cargo aur` at a later date if there is
 sufficient demand.
+
+### Custom Binary Names
+
+If you specify a `[[bin]]` section in your `Cargo.toml` and set the `name`
+field, this will be used as the binary name to install within the PKGBUILD.
+
+### `depends` and `optdepends`
+
+If your package requires other Arch packages at runtime, you can specify these
+within your `Cargo.toml` like this:
+
+```toml
+[package.metadata]
+depends = ["nachos", "pizza"]
+optdepends = ["sushi", "ramen"]
+```
+
+And these settings will be copied to your PKGBUILD.
 
 ### Static Binaries
 
