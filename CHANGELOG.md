@@ -1,6 +1,6 @@
 # `cargo-aur` Changelog
 
-## Unreleased
+## 1.5.0 (2022-04-20)
 
 #### Added
 
