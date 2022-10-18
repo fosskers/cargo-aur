@@ -37,7 +37,7 @@ Navigate to a Rust project, and run:
 cargo aur
 ```
 
-This will produce a `foobar-1.2.3-x86_64.tar.gz` tarball and a PKGBUILD in ``target/aur``.
+This will produce a `foobar-1.2.3-x86_64.tar.gz` tarball and a PKGBUILD in ``target/cargo-aur``.
 
 If you wish, you can now run `makepkg` to ensure that your package actually builds.
 

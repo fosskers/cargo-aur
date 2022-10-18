@@ -142,7 +142,7 @@ struct Binary {
 impl Package {
     /// The name of the tarball that should be produced from this `Package`.
     fn tarball(&self) -> String {
-        format!("target/aur/{}-{}-x86_64.tar.gz", self.name, self.version)
+        format!("target/cargo-aur/{}-{}-x86_64.tar.gz", self.name, self.version)
     }
 
     fn git_host(&self) -> Option<GitHost> {
@@ -192,7 +192,7 @@ fn work(args: Args) -> Result<(), Error> {
         let sha256: String = sha256sum(&config.package)?;
 
         // Write the PKGBUILD.
-        let file = BufWriter::new(File::create("target/aur/PKGBUILD")?);
+        let file = BufWriter::new(File::create("target/cargo-aur/PKGBUILD")?);
         pkgbuild(file, &config, &sha256, license.as_ref())?;
     }
 
