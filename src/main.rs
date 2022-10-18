@@ -91,6 +91,11 @@ struct Package {
 
 #[derive(Deserialize, Debug)]
 struct Metadata {
+    aur: AUR,
+}
+
+#[derive(Deserialize, Debug)]
+struct AUR {
     #[serde(default)]
     depends: Vec<String>,
     #[serde(default)]
@@ -99,13 +104,13 @@ struct Metadata {
 
 impl std::fmt::Display for Metadata {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.depends.as_slice() {
+        match self.aur.depends.as_slice() {
             [middle @ .., last] => {
                 write!(f, "depends=(")?;
                 for item in middle {
                     write!(f, "\"{}\" ", item)?;
                 }
-                if self.optdepends.is_empty().not() {
+                if self.aur.optdepends.is_empty().not() {
                     writeln!(f, "\"{}\")", last)?;
                 } else {
                     write!(f, "\"{}\")", last)?;
@@ -114,7 +119,7 @@ impl std::fmt::Display for Metadata {
             [] => {}
         }
 
-        match self.optdepends.as_slice() {
+        match self.aur.optdepends.as_slice() {
             [middle @ .., last] => {
                 write!(f, "optdepends=(")?;
                 for item in middle {
@@ -137,7 +142,7 @@ struct Binary {
 impl Package {
     /// The name of the tarball that should be produced from this `Package`.
     fn tarball(&self) -> String {
-        format!("{}-{}-x86_64.tar.gz", self.name, self.version)
+        format!("target/aur/{}-{}-x86_64.tar.gz", self.name, self.version)
     }
 
     fn git_host(&self) -> Option<GitHost> {
@@ -187,7 +192,7 @@ fn work(args: Args) -> Result<(), Error> {
         let sha256: String = sha256sum(&config.package)?;
 
         // Write the PKGBUILD.
-        let file = BufWriter::new(File::create("PKGBUILD")?);
+        let file = BufWriter::new(File::create("target/aur/PKGBUILD")?);
         pkgbuild(file, &config, &sha256, license.as_ref())?;
     }
 

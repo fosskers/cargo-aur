@@ -37,7 +37,7 @@ Navigate to a Rust project, and run:
 cargo aur
 ```
 
-This will produce a `foobar-1.2.3-x86_64.tar.gz` tarball and a PKGBUILD.
+This will produce a `foobar-1.2.3-x86_64.tar.gz` tarball and a PKGBUILD in ``target/aur``.
 
 If you wish, you can now run `makepkg` to ensure that your package actually builds.
 
@@ -75,7 +75,7 @@ If your package requires other Arch packages at runtime, you can specify these
 within your `Cargo.toml` like this:
 
 ```toml
-[package.metadata]
+[package.metadata.aur]
 depends = ["nachos", "pizza"]
 optdepends = ["sushi", "ramen"]
 ```
