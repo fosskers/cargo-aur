@@ -174,21 +174,17 @@ fn work(args: Args) -> Result<(), Error> {
     }
 
     let config = cargo_config()?;
-    let license = if must_copy_license(&config.package.license) {
-        p("LICENSE file will be installed manually.".bold().yellow());
-        Some(license_file()?)
-    } else {
-        None
-    };
+    let licenses = license_files()?;
+    // p("LICENSE file will be installed manually.".bold().yellow());
 
     if args.dryrun.not() {
         release_build(args.musl)?;
-        tarball(args.musl, license.as_ref(), &config)?;
+        tarball(args.musl, licenses.as_ref(), &config)?;
         let sha256: String = sha256sum(&config.package)?;
 
         // Write the PKGBUILD.
         let file = BufWriter::new(File::create("PKGBUILD")?);
-        pkgbuild(file, &config, &sha256, license.as_ref())?;
+        pkgbuild(file, &config, &sha256, licenses.as_ref())?;
     }
 
     Ok(())
@@ -208,17 +204,21 @@ fn must_copy_license(license: &str) -> bool {
 }
 
 /// The path to the `LICENSE` file.
-fn license_file() -> Result<DirEntry, Error> {
-    std::fs::read_dir(".")?
+fn license_files() -> Result<Vec<DirEntry>, Error> {
+    let licenses = std::fs::read_dir(".")?
         .filter_map(|entry| entry.ok())
-        .find(|entry| {
+        .filter(|entry| {
             entry
                 .file_name()
                 .to_str()
                 .map(|s| s.starts_with("LICENSE"))
-                .unwrap_or(false)
+                .is_some()
         })
-        .ok_or(Error::MissingLicense)
+        .collect_vec();
+    if licenses.is_empty() {
+        return Err(Error::MissingLicense);
+    }
+    Ok(licenses)
 }
 
 /// Write a legal PKGBUILD to some `Write` instance (a `File` in this case).
@@ -226,7 +226,7 @@ fn pkgbuild<T: Write>(
     mut file: T,
     config: &Config,
     sha256: &str,
-    license: Option<&DirEntry>,
+    license: &[DirEntry],
 ) -> Result<(), Error> {
     let package = &config.package;
     let authors = package
@@ -270,15 +270,14 @@ fn pkgbuild<T: Write>(
         config.binary_name()
     )?;
 
-    if let Some(lic) = license {
+    for lic in license {
         let file_name = lic
             .file_name()
             .into_string()
             .map_err(|_| Error::Utf8OsString)?;
         writeln!(
             file,
-            "    install -Dm644 {} \"$pkgdir/usr/share/licenses/$pkgname/{}\"",
-            file_name, file_name
+            "    install -Dm644 {file_name} \"$pkgdir/usr/share/licenses/$pkgname/{file_name}\"",
         )?;
     }
 
@@ -299,7 +298,7 @@ fn release_build(musl: bool) -> Result<(), Error> {
     Ok(())
 }
 
-fn tarball(musl: bool, license: Option<&DirEntry>, config: &Config) -> Result<(), Error> {
+fn tarball(musl: bool, license: &[DirEntry], config: &Config) -> Result<(), Error> {
     let target_dir: OsString = match std::env::var_os("CARGO_TARGET_DIR") {
         Some(p) => p,
         None => "target".into(),
@@ -325,10 +324,8 @@ fn tarball(musl: bool, license: Option<&DirEntry>, config: &Config) -> Result<()
     command
         .arg("czf")
         .arg(config.package.tarball())
-        .arg(binary_name);
-    if let Some(lic) = license {
-        command.arg(lic.path());
-    }
+        .arg(binary_name)
+        .args(license.iter().map(|l| l.path()).collect_vec());
     command.status()?;
 
     std::fs::remove_file(binary_name)?;
