@@ -140,7 +140,7 @@ struct Binary {
 impl Package {
     /// The name of the tarball that should be produced from this `Package`.
     fn tarball(&self) -> String {
-        format!("{}-{}-x86_64.tar.gz", self.name, self.version)
+        format!("{}-v{}-x86_64.tar.gz", self.name, self.version)
     }
 
     fn git_host(&self) -> Option<GitHost> {
