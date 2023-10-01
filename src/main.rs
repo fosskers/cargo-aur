@@ -40,7 +40,7 @@ struct Args {
     dryrun: bool,
 
     #[options(help = "the sufix for package name")]
-    pub sufix: String,
+    pub sufix: Option<String>,
 }
 
 enum GitHost {
@@ -243,8 +243,8 @@ fn pkgbuild<T: Write>(
         .unwrap_or(GitHost::Github)
         .source(&config.package);
 
-    let sufix = if !args.sufix.is_empty() {
-        args.sufix.as_str()
+    let sufix = if let Some(sufix) = args.sufix.as_ref() {
+        sufix
     } else {
         "-bin"
     };
