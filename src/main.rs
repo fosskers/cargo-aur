@@ -211,8 +211,8 @@ fn license_files() -> Result<Vec<DirEntry>, Error> {
             entry
                 .file_name()
                 .to_str()
-                .map(|s| s.starts_with("LICENSE"))
-                .is_some()
+                .unwrap_or_default()
+                .starts_with("LICENSE")
         })
         .collect_vec();
     if licenses.is_empty() {
