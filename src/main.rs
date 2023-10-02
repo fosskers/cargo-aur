@@ -10,7 +10,7 @@ use std::fs::{DirEntry, File};
 use std::io::{BufWriter, Write};
 use std::ops::Not;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, ExitCode};
 
 /// Licenses avaiable from the Arch Linux `licenses` package.
 ///
@@ -146,17 +146,19 @@ impl Package {
     }
 }
 
-fn main() {
+fn main() -> ExitCode {
     let args = Args::parse_args_or_exit(ParsingStyle::AllOptions);
 
     if args.version {
         let version = env!("CARGO_PKG_VERSION");
         println!("{}", version);
+        ExitCode::SUCCESS
     } else if let Err(e) = work(args) {
         eprintln!("{} {}: {}", "::".bold(), "Error".bold().red(), e);
-        std::process::exit(1)
+        ExitCode::FAILURE
     } else {
         println!("{} {}", "::".bold(), "Done.".bold().green());
+        ExitCode::SUCCESS
     }
 }
 
@@ -354,15 +356,12 @@ fn sha256sum(package: &Package) -> Result<String, Error> {
 fn musl_check() -> Result<(), Error> {
     let args = ["target", "list", "--installed"];
     let output = Command::new("rustup").args(args).output()?.stdout;
-    let installed = std::str::from_utf8(&output)?
-        .lines()
-        .any(|tc| tc == "x86_64-unknown-linux-musl");
 
-    if installed {
-        Ok(())
-    } else {
-        Err(Error::MissingMuslTarget)
-    }
+    std::str::from_utf8(&output)?
+        .lines()
+        .any(|tc| tc == "x86_64-unknown-linux-musl")
+        .then_some(())
+        .ok_or(Error::MissingMuslTarget)
 }
 
 fn p(msg: ColoredString) {
