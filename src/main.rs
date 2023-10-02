@@ -12,12 +12,25 @@ use std::ops::Not;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
-/// Licenses avaiable from the Arch Linux `licenses` package.
+/// Licenses available from the Arch Linux `licenses` package.
 ///
 /// That package contains other licenses, but I've excluded here those unlikely
 /// to be used by Rust crates.
 const LICENSES: &[&str] = &[
-    "AGPL3", "APACHE", "GPL2", "GPL3", "LGPL2.1", "LGPL3", "MPL", "MPL2",
+    "AGPL-3.0-only",
+    "AGPL-3.0-or-later",
+    "Apache-2.0",
+    "BSL-1.0", // Boost Software License.
+    "GPL-2.0-only",
+    "GPL-2.0-or-later",
+    "GPL-3.0-only",
+    "GPL-3.0-or-later",
+    "LGPL-2.0-only",
+    "LGPL-2.0-or-later",
+    "LGPL-3.0-only",
+    "LGPL-3.0-or-later",
+    "MPL-2.0",   // Mozilla Public License.
+    "Unlicense", // Not to be confused with "Unlicensed".
 ];
 
 #[derive(Options)]
@@ -245,8 +258,9 @@ fn cargo_config() -> Result<Config, Error> {
 }
 
 /// If a AUR package's license isn't included in `/usr/share/licenses/common/`,
-/// then it must be installed manually by the PKGBUILD. MIT is such a missing
-/// license, and since many Rust crates use MIT we must make this check.
+/// then it must be installed manually by the PKGBUILD. MIT and BSD3 are such
+/// missing licenses, and since many Rust crates use them we must make this
+/// check.
 fn must_copy_license(license: &str) -> bool {
     LICENSES.contains(&license).not()
 }

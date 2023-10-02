@@ -10,6 +10,10 @@
 - The PKGBUILD and tarball are now output to `target/cargo-aur` to avoid
   cluttering the top-level of the repo.
 
+#### Fixed
+
+- LICENSE file checking is now done via SPDX identifiers.
+
 ## 1.5.0 (2022-04-20)
 
 #### Added
