@@ -1,6 +1,6 @@
 # `cargo-aur` Changelog
 
-## Unreleased
+## 1.6.0 (2023-10-02)
 
 #### Changed
 
@@ -9,6 +9,7 @@
   but you will be warned. This fixes a conflict with other `cargo` subcommands.
 - The PKGBUILD and tarball are now output to `target/cargo-aur` to avoid
   cluttering the top-level of the repo.
+- Reduced binary size.
 
 #### Fixed
 
