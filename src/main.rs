@@ -93,7 +93,7 @@ struct Metadata {
     #[serde(default)]
     optdepends: Vec<String>,
     /// > [package.metadata.aur]
-    aur: AUR,
+    aur: Option<AUR>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -120,12 +120,11 @@ impl std::fmt::Display for Metadata {
         //
         // We print a warning to the user elsewhere if they're still using the
         // old way.
-        let (deps, opts) =
-            if self.aur.depends.is_empty().not() || self.aur.optdepends.is_empty().not() {
-                (self.aur.depends.as_slice(), self.aur.optdepends.as_slice())
-            } else {
-                (self.depends.as_slice(), self.optdepends.as_slice())
-            };
+        let (deps, opts) = if let Some(aur) = self.aur.as_ref() {
+            (aur.depends.as_slice(), aur.optdepends.as_slice())
+        } else {
+            (self.depends.as_slice(), self.optdepends.as_slice())
+        };
 
         match deps {
             [middle @ .., last] => {
@@ -133,7 +132,7 @@ impl std::fmt::Display for Metadata {
                 for item in middle {
                     write!(f, "\"{}\" ", item)?;
                 }
-                if self.aur.optdepends.is_empty().not() {
+                if opts.is_empty().not() {
                     writeln!(f, "\"{}\")", last)?;
                 } else {
                     write!(f, "\"{}\")", last)?;
@@ -215,7 +214,7 @@ fn work(args: Args) -> Result<(), Error> {
     // Warn if the user if still using the old metadata definition style.
     if let Some(metadata) = config.package.metadata.as_ref() {
         if metadata.depends.is_empty().not() || metadata.optdepends.is_empty().not() {
-            p("[package.metadata] is deprecated. Please specify extra dependencies under [package.metadata.aur].".bold().yellow());
+            p("Use of [package.metadata] is deprecated. Please specify extra dependencies under [package.metadata.aur].".bold().yellow());
         }
     }
 
