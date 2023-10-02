@@ -1,17 +1,16 @@
-pub(crate) mod error;
+mod error;
 
 use crate::error::Error;
 use colored::*;
 use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
-use itertools::Itertools;
-use serde_derive::Deserialize;
+use serde::Deserialize;
 use std::ffi::OsString;
 use std::fs::{DirEntry, File};
 use std::io::{BufWriter, Write};
 use std::ops::Not;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, ExitCode};
 
 /// Licenses avaiable from the Arch Linux `licenses` package.
 ///
@@ -25,17 +24,13 @@ const LICENSES: &[&str] = &[
 struct Args {
     /// Display this help message.
     help: bool,
-
     /// Display the current version of this software.
     version: bool,
-
     /// Unused.
     #[options(free)]
     args: Vec<String>,
-
     /// Use the MUSL build target to produce a static binary.
     musl: bool,
-
     /// Don't actually build anything.
     dryrun: bool,
 }
@@ -156,17 +151,19 @@ impl Package {
     }
 }
 
-fn main() {
+fn main() -> ExitCode {
     let args = Args::parse_args_or_exit(ParsingStyle::AllOptions);
 
     if args.version {
         let version = env!("CARGO_PKG_VERSION");
         println!("{}", version);
+        ExitCode::SUCCESS
     } else if let Err(e) = work(args) {
         eprintln!("{} {}: {}", "::".bold(), "Error".bold().red(), e);
-        std::process::exit(1)
+        ExitCode::FAILURE
     } else {
         println!("{} {}", "::".bold(), "Done.".bold().green());
+        ExitCode::SUCCESS
     }
 }
 
@@ -227,17 +224,21 @@ fn license_file() -> Result<DirEntry, Error> {
 }
 
 /// Write a legal PKGBUILD to some `Write` instance (a `File` in this case).
-fn pkgbuild<T: Write>(
+fn pkgbuild<T>(
     mut file: T,
     config: &Config,
     sha256: &str,
     license: Option<&DirEntry>,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    T: Write,
+{
     let package = &config.package;
     let authors = package
         .authors
         .iter()
         .map(|a| format!("# Maintainer: {}", a))
+        .collect::<Vec<_>>()
         .join("\n");
     let source = package
         .git_host()
@@ -358,17 +359,14 @@ fn sha256sum(package: &Package) -> Result<String, Error> {
 
 /// Does the user have the `x86_64-unknown-linux-musl` target installed?
 fn musl_check() -> Result<(), Error> {
-    let args = vec!["target", "list", "--installed"];
+    let args = ["target", "list", "--installed"];
     let output = Command::new("rustup").args(args).output()?.stdout;
-    let installed = std::str::from_utf8(&output)?
-        .lines()
-        .any(|tc| tc == "x86_64-unknown-linux-musl");
 
-    if installed {
-        Ok(())
-    } else {
-        Err(Error::MissingTarget)
-    }
+    std::str::from_utf8(&output)?
+        .lines()
+        .any(|tc| tc == "x86_64-unknown-linux-musl")
+        .then_some(())
+        .ok_or(Error::MissingMuslTarget)
 }
 
 fn p(msg: ColoredString) {
