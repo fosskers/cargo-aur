@@ -1,11 +1,11 @@
-pub(crate) mod error;
+mod error;
 
 use crate::error::Error;
 use colored::*;
 use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
 use itertools::Itertools;
-use serde_derive::Deserialize;
+use serde::Deserialize;
 use std::ffi::OsString;
 use std::fs::{DirEntry, File};
 use std::io::{BufWriter, Write};
@@ -25,17 +25,13 @@ const LICENSES: &[&str] = &[
 struct Args {
     /// Display this help message.
     help: bool,
-
     /// Display the current version of this software.
     version: bool,
-
     /// Unused.
     #[options(free)]
     args: Vec<String>,
-
     /// Use the MUSL build target to produce a static binary.
     musl: bool,
-
     /// Don't actually build anything.
     dryrun: bool,
 }
