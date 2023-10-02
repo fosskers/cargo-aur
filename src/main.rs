@@ -86,6 +86,13 @@ struct Package {
 
 #[derive(Deserialize, Debug)]
 struct Metadata {
+    /// Deprecated.
+    #[serde(default)]
+    depends: Vec<String>,
+    /// Deprecated.
+    #[serde(default)]
+    optdepends: Vec<String>,
+    /// > [package.metadata.aur]
     aur: AUR,
 }
 
@@ -99,7 +106,28 @@ struct AUR {
 
 impl std::fmt::Display for Metadata {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.aur.depends.as_slice() {
+        // Reconcile which section to read extra dependency information from.
+        // The format we hope the user is using is:
+        //
+        // > [package.metadata.aur]
+        //
+        // But version 1.5 originally supported:
+        //
+        // > [package.metadata]
+        //
+        // To avoid a sudden breakage for users, we support both definition
+        // locations but favour the newer one.
+        //
+        // We print a warning to the user elsewhere if they're still using the
+        // old way.
+        let (deps, opts) =
+            if self.aur.depends.is_empty().not() || self.aur.optdepends.is_empty().not() {
+                (self.aur.depends.as_slice(), self.aur.optdepends.as_slice())
+            } else {
+                (self.depends.as_slice(), self.optdepends.as_slice())
+            };
+
+        match deps {
             [middle @ .., last] => {
                 write!(f, "depends=(")?;
                 for item in middle {
@@ -114,7 +142,7 @@ impl std::fmt::Display for Metadata {
             [] => {}
         }
 
-        match self.aur.optdepends.as_slice() {
+        match opts {
             [middle @ .., last] => {
                 write!(f, "optdepends=(")?;
                 for item in middle {
@@ -137,7 +165,10 @@ struct Binary {
 impl Package {
     /// The name of the tarball that should be produced from this `Package`.
     fn tarball(&self) -> String {
-        format!("target/cargo-aur/{}-{}-x86_64.tar.gz", self.name, self.version)
+        format!(
+            "target/cargo-aur/{}-{}-x86_64.tar.gz",
+            self.name, self.version
+        )
     }
 
     fn git_host(&self) -> Option<GitHost> {
@@ -176,6 +207,14 @@ fn work(args: Args) -> Result<(), Error> {
     }
 
     let config = cargo_config()?;
+
+    // Warn if the user if still using the old metadata definition style.
+    if let Some(metadata) = config.package.metadata.as_ref() {
+        if metadata.depends.is_empty().not() || metadata.optdepends.is_empty().not() {
+            p("[package.metadata] is deprecated. Please specify extra dependencies under [package.metadata.aur].".bold().yellow());
+        }
+    }
+
     let license = if must_copy_license(&config.package.license) {
         p("LICENSE file will be installed manually.".bold().yellow());
         Some(license_file()?)
