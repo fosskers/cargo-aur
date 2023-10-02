@@ -4,7 +4,6 @@ use crate::error::Error;
 use colored::*;
 use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
-use itertools::Itertools;
 use serde::Deserialize;
 use std::ffi::OsString;
 use std::fs::{DirEntry, File};
@@ -218,17 +217,21 @@ fn license_file() -> Result<DirEntry, Error> {
 }
 
 /// Write a legal PKGBUILD to some `Write` instance (a `File` in this case).
-fn pkgbuild<T: Write>(
+fn pkgbuild<T>(
     mut file: T,
     config: &Config,
     sha256: &str,
     license: Option<&DirEntry>,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    T: Write,
+{
     let package = &config.package;
     let authors = package
         .authors
         .iter()
         .map(|a| format!("# Maintainer: {}", a))
+        .collect::<Vec<_>>()
         .join("\n");
     let source = package
         .git_host()
@@ -349,7 +352,7 @@ fn sha256sum(package: &Package) -> Result<String, Error> {
 
 /// Does the user have the `x86_64-unknown-linux-musl` target installed?
 fn musl_check() -> Result<(), Error> {
-    let args = vec!["target", "list", "--installed"];
+    let args = ["target", "list", "--installed"];
     let output = Command::new("rustup").args(args).output()?.stdout;
     let installed = std::str::from_utf8(&output)?
         .lines()
@@ -358,7 +361,7 @@ fn musl_check() -> Result<(), Error> {
     if installed {
         Ok(())
     } else {
-        Err(Error::MissingTarget)
+        Err(Error::MissingMuslTarget)
     }
 }
 
