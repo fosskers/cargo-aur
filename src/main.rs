@@ -206,6 +206,10 @@ fn work(args: Args) -> Result<(), Error> {
         musl_check()?
     }
 
+    // Ensure the target can actually be written to. Otherwise the `tar`
+    // operation later on will fail.
+    std::fs::create_dir_all("target/cargo-aur")?;
+
     let config = cargo_config()?;
 
     // Warn if the user if still using the old metadata definition style.
