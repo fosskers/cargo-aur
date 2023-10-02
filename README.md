@@ -1,27 +1,27 @@
 # cargo-aur
 
-[![Build](https://github.com/fosskers/cargo-aur/workflows/Build/badge.svg)](https://github.com/fosskers/cargo-aur/actions)
-[![](https://img.shields.io/crates/v/cargo-aur.svg)](https://crates.io/crates/cargo-aur)
-![AUR version](https://img.shields.io/aur/version/cargo-aur-bin)
+[![Build](https://github.com/fosskers/cargo-aur/workflows/Build/badge.svg)][3]
+[![](https://img.shields.io/crates/v/cargo-aur.svg)][4]
+![AUR version][5]
 
 `cargo-aur` is a new subcommand for `cargo` that produces a release tarball and
 PKGBUILD file for a Rust project, so that it can be released on the Arch Linux
 User Repository (AUR).
 
 No extra configuration is necessary. As long as your `Cargo.toml` has [the usual
-fields](https://rust-lang.github.io/api-guidelines/documentation.html#c-metadata),
-a PKGBUILD will be generated with all the necessary sections filled out.
+fields][0], a PKGBUILD will be generated with all the necessary sections filled
+out.
 
 ## Installation
 
 Guess what? `cargo-aur` itself is on the AUR! Install it with an AUR-compatible
-package manager like [`aura`](https://github.com/fosskers/aura):
+package manager like [`aura`][1]:
 
 ```
 sudo aura -A cargo-aur-bin
 ```
 
-... or via `cargo`:
+...or via `cargo`:
 
 ```
 cargo install cargo-aur
@@ -85,7 +85,7 @@ And these settings will be copied to your PKGBUILD.
 ### Static Binaries
 
 Run with `--musl` to produce a release binary that is statically linked via
-[MUSL](https://musl.libc.org/).
+[MUSL][2].
 
 ```
 > cargo aur --musl
@@ -93,3 +93,10 @@ Run with `--musl` to produce a release binary that is statically linked via
 > ldd <your-binary>
     not a dynamic executable
 ```
+
+[0]: https://rust-lang.github.io/api-guidelines/documentation.html#c-metadata 
+[1]: https://github.com/fosskers/aura
+[2]: https://musl.libc.org/
+[3]: https://github.com/fosskers/cargo-aur/actions
+[4]: https://crates.io/crates/cargo-aur
+[5]: https://img.shields.io/aur/version/cargo-aur-bin
