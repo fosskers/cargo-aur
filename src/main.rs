@@ -1,41 +1,49 @@
-pub(crate) mod error;
+mod error;
 
 use crate::error::Error;
 use colored::*;
 use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
-use itertools::Itertools;
-use serde_derive::Deserialize;
+use serde::Deserialize;
 use std::ffi::OsString;
 use std::fs::{DirEntry, File};
 use std::io::{BufWriter, Write};
 use std::ops::Not;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, ExitCode};
 
-/// Licenses avaiable from the Arch Linux `licenses` package.
+/// Licenses available from the Arch Linux `licenses` package.
 ///
 /// That package contains other licenses, but I've excluded here those unlikely
 /// to be used by Rust crates.
 const LICENSES: &[&str] = &[
-    "AGPL3", "APACHE", "GPL2", "GPL3", "LGPL2.1", "LGPL3", "MPL", "MPL2",
+    "AGPL-3.0-only",
+    "AGPL-3.0-or-later",
+    "Apache-2.0",
+    "BSL-1.0", // Boost Software License.
+    "GPL-2.0-only",
+    "GPL-2.0-or-later",
+    "GPL-3.0-only",
+    "GPL-3.0-or-later",
+    "LGPL-2.0-only",
+    "LGPL-2.0-or-later",
+    "LGPL-3.0-only",
+    "LGPL-3.0-or-later",
+    "MPL-2.0",   // Mozilla Public License.
+    "Unlicense", // Not to be confused with "Unlicensed".
 ];
 
 #[derive(Options)]
 struct Args {
     /// Display this help message.
     help: bool,
-
     /// Display the current version of this software.
     version: bool,
-
     /// Unused.
     #[options(free)]
     args: Vec<String>,
-
     /// Use the MUSL build target to produce a static binary.
     musl: bool,
-
     /// Don't actually build anything.
     dryrun: bool,
 
@@ -94,6 +102,18 @@ struct Package {
 
 #[derive(Deserialize, Debug)]
 struct Metadata {
+    /// Deprecated.
+    #[serde(default)]
+    depends: Vec<String>,
+    /// Deprecated.
+    #[serde(default)]
+    optdepends: Vec<String>,
+    /// > [package.metadata.aur]
+    aur: Option<AUR>,
+}
+
+#[derive(Deserialize, Debug)]
+struct AUR {
     #[serde(default)]
     depends: Vec<String>,
     #[serde(default)]
@@ -102,13 +122,33 @@ struct Metadata {
 
 impl std::fmt::Display for Metadata {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.depends.as_slice() {
+        // Reconcile which section to read extra dependency information from.
+        // The format we hope the user is using is:
+        //
+        // > [package.metadata.aur]
+        //
+        // But version 1.5 originally supported:
+        //
+        // > [package.metadata]
+        //
+        // To avoid a sudden breakage for users, we support both definition
+        // locations but favour the newer one.
+        //
+        // We print a warning to the user elsewhere if they're still using the
+        // old way.
+        let (deps, opts) = if let Some(aur) = self.aur.as_ref() {
+            (aur.depends.as_slice(), aur.optdepends.as_slice())
+        } else {
+            (self.depends.as_slice(), self.optdepends.as_slice())
+        };
+
+        match deps {
             [middle @ .., last] => {
                 write!(f, "depends=(")?;
                 for item in middle {
                     write!(f, "\"{}\" ", item)?;
                 }
-                if self.optdepends.is_empty().not() {
+                if opts.is_empty().not() {
                     writeln!(f, "\"{}\")", last)?;
                 } else {
                     write!(f, "\"{}\")", last)?;
@@ -117,7 +157,7 @@ impl std::fmt::Display for Metadata {
             [] => {}
         }
 
-        match self.optdepends.as_slice() {
+        match opts {
             [middle @ .., last] => {
                 write!(f, "optdepends=(")?;
                 for item in middle {
@@ -140,7 +180,10 @@ struct Binary {
 impl Package {
     /// The name of the tarball that should be produced from this `Package`.
     fn tarball(&self) -> String {
-        format!("{}-v{}-x86_64.tar.gz", self.name, self.version)
+        format!(
+            "target/cargo-aur/{}-{}-x86_64.tar.gz",
+            self.name, self.version
+        )
     }
 
     fn git_host(&self) -> Option<GitHost> {
@@ -154,17 +197,19 @@ impl Package {
     }
 }
 
-fn main() {
+fn main() -> ExitCode {
     let args = Args::parse_args_or_exit(ParsingStyle::AllOptions);
 
     if args.version {
         let version = env!("CARGO_PKG_VERSION");
         println!("{}", version);
+        ExitCode::SUCCESS
     } else if let Err(e) = work(args) {
         eprintln!("{} {}: {}", "::".bold(), "Error".bold().red(), e);
-        std::process::exit(1)
+        ExitCode::FAILURE
     } else {
         println!("{} {}", "::".bold(), "Done.".bold().green());
+        ExitCode::SUCCESS
     }
 }
 
@@ -176,9 +221,25 @@ fn work(args: Args) -> Result<(), Error> {
         musl_check()?
     }
 
+    // Ensure the target can actually be written to. Otherwise the `tar`
+    // operation later on will fail.
+    std::fs::create_dir_all("target/cargo-aur")?;
+
     let config = cargo_config()?;
+    // Warn if the user if still using the old metadata definition style.
+    if let Some(metadata) = config.package.metadata.as_ref() {
+        if metadata.depends.is_empty().not() || metadata.optdepends.is_empty().not() {
+            p("Use of [package.metadata] is deprecated. Please specify extra dependencies under [package.metadata.aur].".bold().yellow());
+        }
+    }
+
     let licenses = license_files()?;
-    // p("LICENSE file will be installed manually.".bold().yellow());
+    let license = if must_copy_license(&config.package.license) {
+        p("LICENSE file will be installed manually.".bold().yellow());
+        Some(license_file()?)
+    } else {
+        None
+    };
 
     if args.dryrun.not() {
         release_build(args.musl)?;
@@ -186,7 +247,8 @@ fn work(args: Args) -> Result<(), Error> {
         let sha256: String = sha256sum(&config.package)?;
 
         // Write the PKGBUILD.
-        let file = BufWriter::new(File::create("PKGBUILD")?);
+        // TODO: make output custom
+        let file = BufWriter::new(File::create("target/cargo-aur/PKGBUILD")?);
         pkgbuild(file, args, &config, &sha256, licenses.as_ref())?;
     }
 
@@ -200,8 +262,9 @@ fn cargo_config() -> Result<Config, Error> {
 }
 
 /// If a AUR package's license isn't included in `/usr/share/licenses/common/`,
-/// then it must be installed manually by the PKGBUILD. MIT is such a missing
-/// license, and since many Rust crates use MIT we must make this check.
+/// then it must be installed manually by the PKGBUILD. MIT and BSD3 are such
+/// missing licenses, and since many Rust crates use them we must make this
+/// check.
 fn must_copy_license(license: &str) -> bool {
     LICENSES.contains(&license).not()
 }
@@ -225,18 +288,22 @@ fn license_files() -> Result<Vec<DirEntry>, Error> {
 }
 
 /// Write a legal PKGBUILD to some `Write` instance (a `File` in this case).
-fn pkgbuild<T: Write>(
+fn pkgbuild<T>(
     mut file: T,
     args: Args,
     config: &Config,
     sha256: &str,
     license: &[DirEntry],
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    T: Write,
+{
     let package = &config.package;
     let authors = package
         .authors
         .iter()
         .map(|a| format!("# Maintainer: {}", a))
+        .collect::<Vec<_>>()
         .join("\n");
     let source = package
         .git_host()
@@ -360,17 +427,14 @@ fn sha256sum(package: &Package) -> Result<String, Error> {
 
 /// Does the user have the `x86_64-unknown-linux-musl` target installed?
 fn musl_check() -> Result<(), Error> {
-    let args = vec!["target", "list", "--installed"];
+    let args = ["target", "list", "--installed"];
     let output = Command::new("rustup").args(args).output()?.stdout;
-    let installed = std::str::from_utf8(&output)?
-        .lines()
-        .any(|tc| tc == "x86_64-unknown-linux-musl");
 
-    if installed {
-        Ok(())
-    } else {
-        Err(Error::MissingTarget)
-    }
+    std::str::from_utf8(&output)?
+        .lines()
+        .any(|tc| tc == "x86_64-unknown-linux-musl")
+        .then_some(())
+        .ok_or(Error::MissingMuslTarget)
 }
 
 fn p(msg: ColoredString) {

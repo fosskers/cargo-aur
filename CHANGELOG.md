@@ -1,5 +1,20 @@
 # `cargo-aur` Changelog
 
+## 1.6.0 (2023-10-02)
+
+#### Changed
+
+- The `[package.metadata]` section for adding extra dependency information
+  should now be named `[package.metadata.aur]`. The old syntax will still work,
+  but you will be warned. This fixes a conflict with other `cargo` subcommands.
+- The PKGBUILD and tarball are now output to `target/cargo-aur` to avoid
+  cluttering the top-level of the repo.
+- Reduced binary size.
+
+#### Fixed
+
+- LICENSE file checking is now done via SPDX identifiers.
+
 ## 1.5.0 (2022-04-20)
 
 #### Added
