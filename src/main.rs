@@ -2,7 +2,6 @@ mod error;
 
 use crate::error::Error;
 use colored::*;
-use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
 use serde::Deserialize;
 use std::ffi::OsString;
@@ -11,6 +10,8 @@ use std::io::{BufWriter, Write};
 use std::ops::Not;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
+
+mod args;
 
 /// Licenses available from the Arch Linux `licenses` package.
 ///
@@ -32,24 +33,6 @@ const LICENSES: &[&str] = &[
     "MPL-2.0",   // Mozilla Public License.
     "Unlicense", // Not to be confused with "Unlicensed".
 ];
-
-#[derive(Options)]
-struct Args {
-    /// Display this help message.
-    help: bool,
-    /// Display the current version of this software.
-    version: bool,
-    /// Unused.
-    #[options(free)]
-    args: Vec<String>,
-    /// Use the MUSL build target to produce a static binary.
-    musl: bool,
-    /// Don't actually build anything.
-    dryrun: bool,
-
-    #[options(help = "the sufix for package name")]
-    pub sufix: Option<String>,
-}
 
 enum GitHost {
     Github,
