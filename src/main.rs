@@ -1,17 +1,17 @@
+mod args;
+mod dist;
 mod error;
+mod metadata;
+mod pkgbuild;
 
 use crate::error::Error;
+use args::{get_args, CargoAurArgs};
 use colored::*;
-use hmac_sha256::Hash;
-use serde::Deserialize;
-use std::ffi::OsString;
-use std::fs::{DirEntry, File};
-use std::io::{BufWriter, Write};
+use metadata::Config;
+use std::fs::DirEntry;
 use std::ops::Not;
-use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode};
 
-mod args;
+type CargoAurResult = Result<(), Error>;
 
 /// Licenses available from the Arch Linux `licenses` package.
 ///
@@ -34,181 +34,22 @@ const LICENSES: &[&str] = &[
     "Unlicense", // Not to be confused with "Unlicensed".
 ];
 
-enum GitHost {
-    Github,
-    Gitlab,
+fn main() {
+    let args = get_args();
+
+    work(&args)
+        .map_err(|e| eprintln!("{} {}: {}", "::".bold(), "Error".bold().red(), e))
+        .unwrap();
+    println!("{} {}", "::".bold(), "Done.".bold().green());
 }
 
-impl GitHost {
-    fn source(&self, package: &Package) -> String {
-        match self {
-            GitHost::Github => format!(
-                "{}/releases/download/v$pkgver/{}-$pkgver-x86_64.tar.gz",
-                package.repository, package.name
-            ),
-            GitHost::Gitlab => format!(
-                "{}/-/archive/v$pkgver/{}-$pkgver-x86_64.tar.gz",
-                package.repository, package.name
-            ),
-        }
-    }
-}
-
-#[derive(Deserialize, Debug)]
-struct Config {
-    package: Package,
-    #[serde(default)]
-    bin: Vec<Binary>,
-}
-
-impl Config {
-    /// The name of the compiled binary that should be copied to the tarball.
-    fn binary_name(&self) -> &str {
-        self.bin
-            .first()
-            .map(|bin| bin.name.as_str())
-            .unwrap_or(self.package.name.as_str())
-    }
-}
-
-#[derive(Deserialize, Debug)]
-struct Package {
-    name: String,
-    version: String,
-    authors: Vec<String>,
-    description: String,
-    homepage: String,
-    repository: String,
-    license: String,
-    metadata: Option<Metadata>,
-}
-
-#[derive(Deserialize, Debug)]
-struct Metadata {
-    /// Deprecated.
-    #[serde(default)]
-    depends: Vec<String>,
-    /// Deprecated.
-    #[serde(default)]
-    optdepends: Vec<String>,
-    /// > [package.metadata.aur]
-    aur: Option<AUR>,
-}
-
-#[derive(Deserialize, Debug)]
-struct AUR {
-    #[serde(default)]
-    depends: Vec<String>,
-    #[serde(default)]
-    optdepends: Vec<String>,
-}
-
-impl std::fmt::Display for Metadata {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Reconcile which section to read extra dependency information from.
-        // The format we hope the user is using is:
-        //
-        // > [package.metadata.aur]
-        //
-        // But version 1.5 originally supported:
-        //
-        // > [package.metadata]
-        //
-        // To avoid a sudden breakage for users, we support both definition
-        // locations but favour the newer one.
-        //
-        // We print a warning to the user elsewhere if they're still using the
-        // old way.
-        let (deps, opts) = if let Some(aur) = self.aur.as_ref() {
-            (aur.depends.as_slice(), aur.optdepends.as_slice())
-        } else {
-            (self.depends.as_slice(), self.optdepends.as_slice())
-        };
-
-        match deps {
-            [middle @ .., last] => {
-                write!(f, "depends=(")?;
-                for item in middle {
-                    write!(f, "\"{}\" ", item)?;
-                }
-                if opts.is_empty().not() {
-                    writeln!(f, "\"{}\")", last)?;
-                } else {
-                    write!(f, "\"{}\")", last)?;
-                }
-            }
-            [] => {}
-        }
-
-        match opts {
-            [middle @ .., last] => {
-                write!(f, "optdepends=(")?;
-                for item in middle {
-                    write!(f, "\"{}\" ", item)?;
-                }
-                write!(f, "\"{}\")", last)?;
-            }
-            [] => {}
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Deserialize, Debug)]
-struct Binary {
-    name: String,
-}
-
-impl Package {
-    /// The name of the tarball that should be produced from this `Package`.
-    fn tarball(&self) -> String {
-        format!(
-            "target/cargo-aur/{}-{}-x86_64.tar.gz",
-            self.name, self.version
-        )
-    }
-
-    fn git_host(&self) -> Option<GitHost> {
-        if self.repository.starts_with("https://github") {
-            Some(GitHost::Github)
-        } else if self.repository.starts_with("https://gitlab") {
-            Some(GitHost::Gitlab)
-        } else {
-            None
-        }
-    }
-}
-
-fn main() -> ExitCode {
-    let args = Args::parse_args_or_exit(ParsingStyle::AllOptions);
-
-    if args.version {
-        let version = env!("CARGO_PKG_VERSION");
-        println!("{}", version);
-        ExitCode::SUCCESS
-    } else if let Err(e) = work(args) {
-        eprintln!("{} {}: {}", "::".bold(), "Error".bold().red(), e);
-        ExitCode::FAILURE
-    } else {
-        println!("{} {}", "::".bold(), "Done.".bold().green());
-        ExitCode::SUCCESS
-    }
-}
-
-fn work(args: Args) -> Result<(), Error> {
-    // We can't proceed if the user has specified `--musl` but doesn't have the
-    // target installed.
-    if args.musl {
-        p("Checking for musl toolchain...".bold());
-        musl_check()?
-    }
-
+fn work(args: &CargoAurArgs) -> Result<(), Error> {
     // Ensure the target can actually be written to. Otherwise the `tar`
     // operation later on will fail.
-    std::fs::create_dir_all("target/cargo-aur")?;
+    std::fs::create_dir_all(&args.output_folder)?;
 
-    let config = cargo_config()?;
+    let config = Config::new()?;
+
     // Warn if the user if still using the old metadata definition style.
     if let Some(metadata) = config.package.metadata.as_ref() {
         if metadata.depends.is_empty().not() || metadata.optdepends.is_empty().not() {
@@ -217,39 +58,11 @@ fn work(args: Args) -> Result<(), Error> {
     }
 
     let licenses = license_files()?;
-    let license = if must_copy_license(&config.package.license) {
+    if !licenses.is_empty() {
         p("LICENSE file will be installed manually.".bold().yellow());
-        Some(license_file()?)
-    } else {
-        None
     };
 
-    if args.dryrun.not() {
-        release_build(args.musl)?;
-        tarball(args.musl, licenses.as_ref(), &config)?;
-        let sha256: String = sha256sum(&config.package)?;
-
-        // Write the PKGBUILD.
-        // TODO: make output custom
-        let file = BufWriter::new(File::create("target/cargo-aur/PKGBUILD")?);
-        pkgbuild(file, args, &config, &sha256, licenses.as_ref())?;
-    }
-
-    Ok(())
-}
-
-fn cargo_config() -> Result<Config, Error> {
-    let content = std::fs::read_to_string("Cargo.toml")?;
-    let proj: Config = toml::from_str(&content)?;
-    Ok(proj)
-}
-
-/// If a AUR package's license isn't included in `/usr/share/licenses/common/`,
-/// then it must be installed manually by the PKGBUILD. MIT and BSD3 are such
-/// missing licenses, and since many Rust crates use them we must make this
-/// check.
-fn must_copy_license(license: &str) -> bool {
-    LICENSES.contains(&license).not()
+    args.action.exec(&args.output_folder, &config, licenses.as_ref())
 }
 
 /// The path to the `LICENSE` file.
@@ -257,169 +70,17 @@ fn license_files() -> Result<Vec<DirEntry>, Error> {
     let licenses = std::fs::read_dir(".")?
         .filter_map(|entry| entry.ok())
         .filter(|entry| {
-            entry
-                .file_name()
-                .to_str()
-                .unwrap_or_default()
-                .starts_with("LICENSE")
+            let binding = entry.file_name();
+            let name = binding.to_str().unwrap_or_default();
+            name.starts_with("LICENSE") && !LICENSES.contains(&name)
         })
-        .collect_vec();
+        .collect::<Vec<_>>();
     if licenses.is_empty() {
         return Err(Error::MissingLicense);
     }
     Ok(licenses)
 }
 
-/// Write a legal PKGBUILD to some `Write` instance (a `File` in this case).
-fn pkgbuild<T>(
-    mut file: T,
-    args: Args,
-    config: &Config,
-    sha256: &str,
-    license: &[DirEntry],
-) -> Result<(), Error>
-where
-    T: Write,
-{
-    let package = &config.package;
-    let authors = package
-        .authors
-        .iter()
-        .map(|a| format!("# Maintainer: {}", a))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let source = package
-        .git_host()
-        .unwrap_or(GitHost::Github)
-        .source(&config.package);
-
-    let sufix = if let Some(sufix) = args.sufix.as_ref() {
-        sufix
-    } else {
-        "-bin"
-    };
-
-    writeln!(file, "{}", authors)?;
-    writeln!(file, "#")?;
-    writeln!(
-        file,
-        "# This PKGBUILD was generated by `cargo aur`: https://crates.io/crates/cargo-aur"
-    )?;
-    writeln!(file)?;
-    writeln!(file, "pkgname={}{sufix}", package.name)?;
-    writeln!(file, "pkgver={}", package.version)?;
-    writeln!(file, "pkgrel=1")?;
-    writeln!(file, "pkgdesc=\"{}\"", package.description)?;
-    writeln!(file, "url=\"{}\"", package.homepage)?;
-    writeln!(file, "license=(\"{}\")", package.license)?;
-    writeln!(file, "arch=(\"x86_64\")")?;
-    writeln!(file, "provides=(\"{}\")", package.name)?;
-    writeln!(file, "conflicts=(\"{}\")", package.name)?;
-
-    if let Some(metadata) = package.metadata.as_ref() {
-        writeln!(file, "{}", metadata)?;
-    }
-
-    writeln!(file, "source=(\"{}\")", source)?;
-    writeln!(file, "sha256sums=(\"{}\")", sha256)?;
-    writeln!(file)?;
-    writeln!(file, "package() {{")?;
-    writeln!(
-        file,
-        "    install -Dm755 {} -t \"$pkgdir/usr/bin\"",
-        config.binary_name()
-    )?;
-
-    for lic in license {
-        let file_name = lic
-            .file_name()
-            .into_string()
-            .map_err(|_| Error::Utf8OsString)?;
-        writeln!(
-            file,
-            "    install -Dm644 {file_name} \"$pkgdir/usr/share/licenses/$pkgname/{file_name}\"",
-        )?;
-    }
-
-    writeln!(file, "}}")?;
-    Ok(())
-}
-
-/// Run `cargo build --release`, potentially building statically.
-fn release_build(musl: bool) -> Result<(), Error> {
-    let mut args = vec!["build", "--release"];
-
-    if musl {
-        args.push("--target=x86_64-unknown-linux-musl");
-    }
-
-    p("Running release build...".bold());
-    Command::new("cargo").args(args).status()?;
-    Ok(())
-}
-
-fn tarball(musl: bool, license: &[DirEntry], config: &Config) -> Result<(), Error> {
-    let target_dir: OsString = match std::env::var_os("CARGO_TARGET_DIR") {
-        Some(p) => p,
-        None => "target".into(),
-    };
-
-    let release_dir = if musl {
-        "x86_64-unknown-linux-musl/release"
-    } else {
-        "release"
-    };
-
-    let binary_name = config.binary_name();
-    let mut binary: PathBuf = target_dir.into();
-    binary.push(release_dir);
-    binary.push(binary_name);
-
-    strip(&binary)?;
-    std::fs::copy(binary, binary_name)?;
-
-    // Create the tarball.
-    p("Packing tarball...".bold());
-    let mut command = Command::new("tar");
-    command
-        .arg("czf")
-        .arg(config.package.tarball())
-        .arg(binary_name)
-        .args(license.iter().map(|l| l.path()).collect_vec());
-    command.status()?;
-
-    std::fs::remove_file(binary_name)?;
-
-    Ok(())
-}
-
-/// Strip the release binary, so that we aren't compressing more bytes than we
-/// need to.
-fn strip(path: &Path) -> Result<(), Error> {
-    p("Stripping binary...".bold());
-    Command::new("strip").arg(path).status()?;
-    Ok(()) // FIXME Would love to use my `void` package here and elsewhere.
-}
-
-fn sha256sum(package: &Package) -> Result<String, Error> {
-    let bytes = std::fs::read(package.tarball())?;
-    let digest = Hash::hash(&bytes);
-    let hex = digest.iter().map(|u| format!("{:02x}", u)).collect();
-    Ok(hex)
-}
-
-/// Does the user have the `x86_64-unknown-linux-musl` target installed?
-fn musl_check() -> Result<(), Error> {
-    let args = ["target", "list", "--installed"];
-    let output = Command::new("rustup").args(args).output()?.stdout;
-
-    std::str::from_utf8(&output)?
-        .lines()
-        .any(|tc| tc == "x86_64-unknown-linux-musl")
-        .then_some(())
-        .ok_or(Error::MissingMuslTarget)
-}
-
-fn p(msg: ColoredString) {
+pub fn p(msg: ColoredString) {
     println!("{} {}", "::".bold(), msg)
 }
