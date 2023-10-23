@@ -30,8 +30,6 @@ where
         .unwrap_or_default()
         .source(&ctx, &config.package)?;
 
-    println!("Source: {:?}", package.git_host());
-
     writeln!(file, "{}", authors)?;
     writeln!(file, "#")?;
     writeln!(
