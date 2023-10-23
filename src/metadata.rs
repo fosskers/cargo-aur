@@ -1,5 +1,6 @@
 use hmac_sha256::Hash;
 use serde::Deserialize;
+use srtemplate::SrTemplate;
 
 use crate::error::Error;
 
@@ -41,6 +42,8 @@ pub struct Package {
 pub struct AUR {
     // Templating package name
     pub(crate) package_name: Option<String>,
+    // Templating package version name
+    pub(crate) source_download: Option<String>,
     #[serde(default)]
     pub(crate) depends: Vec<String>,
     #[serde(default)]
@@ -48,15 +51,37 @@ pub struct AUR {
 }
 
 impl Package {
+    pub fn fill_template(&self, ctx: &SrTemplate) {
+        ctx.add_variable("name", &self.name);
+        ctx.add_variable("version", &self.version);
+        ctx.add_variable("repository", &self.repository);
+    }
+
+    pub fn template_name(&self) -> String {
+        if let Some(Metadata { aur, .. }) = &self.metadata {
+            if let Some(AUR { package_name, .. }) = aur {
+                return package_name.clone().unwrap_or(self.name.clone());
+            }
+        }
+        self.name.clone()
+    }
+
     /// The name of the tarball that should be produced from this `Package`.
     pub fn tarball(&self) -> String {
-        format!(
-            "{}-{}-x86_64.tar.gz",
-            self.name, self.version
-        )
+        format!("{}-{}-x86_64.tar.gz", self.name, self.version)
     }
 
     pub fn git_host(&self) -> Option<GitHost> {
+        if let Some(Metadata { aur, .. }) = &self.metadata {
+            if let Some(AUR {
+                source_download, ..
+            }) = aur
+            {
+                if let Some(source) = source_download {
+                    return Some(GitHost::Custom(source.clone()));
+                }
+            }
+        }
         if self.repository.starts_with("https://github") {
             Some(GitHost::Github)
         } else if self.repository.starts_with("https://gitlab") {
@@ -74,24 +99,26 @@ impl Package {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub enum GitHost {
     #[default]
     Github,
     Gitlab,
+    Custom(String),
 }
 
 impl GitHost {
-    pub fn source(&self, package: &Package) -> String {
+    pub fn source(&self, ctx: &SrTemplate, package: &Package) -> Result<String, Error> {
         match self {
-            GitHost::Github => format!(
+            GitHost::Github => Ok(format!(
                 "{}/releases/download/$pkgver/{}-$pkgver-x86_64.tar.gz",
                 package.repository, package.name
-            ),
-            GitHost::Gitlab => format!(
+            )),
+            GitHost::Gitlab => Ok(format!(
                 "{}/-/archive/$pkgver/{}-$pkgver-x86_64.tar.gz",
                 package.repository, package.name
-            ),
+            )),
+            GitHost::Custom(src) => ctx.render(src).map_err(Error::TempateError),
         }
     }
 }

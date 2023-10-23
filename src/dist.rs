@@ -67,12 +67,14 @@ pub fn tarball(
     out_tar.push(config.package.tarball());
     let out_tar = out_tar.to_str().unwrap_or_default().to_string();
 
+    let licenses = licenses.iter().map(|l| l.path()).collect::<Vec<_>>();
+
     let mut command = Command::new("tar");
     command
         .arg("czf")
         .arg(out_tar.clone())
         .arg(binary_name)
-        .args(licenses.iter().map(|l| l.path()).collect::<Vec<_>>());
+        .args(licenses);
     command.status()?;
 
     std::fs::remove_file(binary_name)?;

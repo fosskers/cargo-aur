@@ -3,6 +3,7 @@ use std::io::BufWriter;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
+use srtemplate::SrTemplate;
 
 use crate::dist::build_package;
 use crate::metadata::Config;
@@ -14,6 +15,7 @@ use crate::CargoAurResult;
 #[command(next_line_help = true)]
 pub struct CargoAurArgs {
     /// Don't actually build anything.
+    #[clap(short, long)]
     dryrun: bool,
 
     #[clap(subcommand)]
@@ -25,11 +27,13 @@ pub struct CargoAurArgs {
 
 #[derive(Clone, Debug, Subcommand)]
 pub enum CargoAurActions {
+    #[clap(alias = "b")]
     Build {
         /// Use the MUSL build target to produce a static binary.
-        #[clap(default_value = "false")]
+        #[clap(long, short, default_value = "false")]
         musl: bool,
     },
+    #[clap(alias = "g")]
     Generate {
         input: String,
     },
@@ -46,12 +50,15 @@ impl CargoAurActions {
             CargoAurActions::Generate { input } => input.clone(),
         };
 
+        let ctx_template = SrTemplate::default();
+        config.package.fill_template(&ctx_template);
+
         let mut file = output.clone();
         file.push("PKGBUILD");
         let file = BufWriter::new(File::create(file)?);
 
         let sha256: String = config.package.sha256sum(generated_file)?;
 
-        pkgbuild(file, config, &sha256, licenses)
+        pkgbuild(ctx_template, file, config, &sha256, licenses)
     }
 }

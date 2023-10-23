@@ -9,6 +9,7 @@ pub(crate) enum Error {
     Utf8OsString,
     MissingMuslTarget,
     MissingLicense,
+    TempateError(srtemplate::SrTemplateError),
 }
 
 impl Display for Error {
@@ -25,6 +26,7 @@ impl Display for Error {
             Error::MissingLicense => {
                 write!(f, "Missing LICENSE file. See https://choosealicense.com/")
             }
+            Error::TempateError(e) => write!(f, "Error Rendering Text Template: {}", e),
         }
     }
 }
@@ -44,5 +46,11 @@ impl From<toml::de::Error> for Error {
 impl From<std::io::Error> for Error {
     fn from(v: std::io::Error) -> Self {
         Self::IO(v)
+    }
+}
+
+impl From<srtemplate::SrTemplateError> for Error {
+    fn from(v: srtemplate::SrTemplateError) -> Self {
+        Self::TempateError(v)
     }
 }
