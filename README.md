@@ -77,6 +77,11 @@ within your `Cargo.toml` like this:
 
 ```toml
 [package.metadata.aur]
+# give your package a personalized name
+package_name = "super-name-bin"
+# for custom source download (any other than github or gitlab )
+source_download = "https://myserver.com/path/{{ version }}/linux/x86_64"
+# Libraries on which your project depends
 depends = ["nachos", "pizza"]
 optdepends = ["sushi", "ramen"]
 ```
@@ -84,15 +89,54 @@ optdepends = ["sushi", "ramen"]
 And these settings will be copied to your PKGBUILD.
 
 ### Static Binaries
+> [!NOTE]
+> You can use the -h or --help flag to see what options `cargo-aur` has
 
-Run with `--musl` to produce a release binary that is statically linked via
-[MUSL][2].
+
+You can use the `build` subcommand to build the binary by default.
+> [!NOTE]
+>  Run with `--musl` to produce a release binary that is statically linked via [MUSL][2].
 
 ```
-> cargo aur --musl
+Usage: cargo aur build [OPTIONS]
+
+Options:
+  -m, --musl
+          Use the MUSL build target to produce a static binary
+  -h, --help
+          Print help
+```
+Example:
+> [!NOTE]
+> by passing the -or option you can tell it another file on which it will be 
+
+```
+> cargo aur build --musl
 > cd target/x86_64-unknown-linux-musl/release/
 > ldd <your-binary>
     not a dynamic executable
+```
+
+You can also use the `generate` command to use a .tar.gz file you already have ready.
+```
+Usage: cargo aur generate <INPUT>
+
+Arguments:
+  <INPUT>
+
+
+Options:
+  -h, --help
+          Print help
+```
+> [!NOTE]
+> by passing the -or option you can tell it another file on which it will be 
+
+```
+> cargo aur -o out generate target/cargo-aur/cargo-aur-1.6.0-x86_64.tar.gz
+> ls ./out
+  PKGBUILD
+  cargo-aur-1.6.0-x86_64.tar.gz
 ```
 
 [0]: https://rust-lang.github.io/api-guidelines/documentation.html#c-metadata 
