@@ -1,8 +1,15 @@
 //! Errors that can occur in this application.
 
 use std::fmt::Display;
+use std::process::ExitCode;
 
-pub(crate) enum Error {
+use colored::Colorize;
+
+pub trait Termination {
+    fn report(self) -> ExitCode;
+}
+
+pub enum Error {
     IO(std::io::Error),
     Toml(toml::de::Error),
     Utf8(std::str::Utf8Error),
@@ -28,6 +35,18 @@ impl Display for Error {
             }
             Error::TempateError(e) => write!(f, "Error Rendering Text Template: {}", e),
         }
+    }
+}
+
+impl Termination for Result<(), Error> {
+    fn report(self) -> ExitCode {
+        if let Err(e) = self {
+            eprintln!("{} {}: {}", "::".bold(), "Error".bold().red(), e);
+            return ExitCode::FAILURE;
+        }
+
+        println!("{} {}", "::".bold(), "Done.".bold().green());
+        ExitCode::SUCCESS
     }
 }
 

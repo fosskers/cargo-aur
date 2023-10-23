@@ -7,9 +7,11 @@ mod pkgbuild;
 use crate::error::Error;
 use args::{get_args, CargoAurArgs};
 use colored::*;
+use error::Termination;
 use metadata::Config;
 use std::fs::DirEntry;
 use std::ops::Not;
+use std::process::ExitCode;
 
 type CargoAurResult = Result<(), Error>;
 
@@ -34,16 +36,13 @@ const LICENSES: &[&str] = &[
     "Unlicense", // Not to be confused with "Unlicensed".
 ];
 
-fn main() {
+fn main() -> ExitCode {
     let args = get_args();
 
-    work(&args)
-        .map_err(|e| eprintln!("{} {}: {}", "::".bold(), "Error".bold().red(), e))
-        .unwrap();
-    println!("{} {}", "::".bold(), "Done.".bold().green());
+    work(&args).report()
 }
 
-fn work(args: &CargoAurArgs) -> Result<(), Error> {
+fn work(args: &CargoAurArgs) -> CargoAurResult {
     // Ensure the target can actually be written to. Otherwise the `tar`
     // operation later on will fail.
     std::fs::create_dir_all(&args.output_folder)?;
@@ -62,7 +61,8 @@ fn work(args: &CargoAurArgs) -> Result<(), Error> {
         p("LICENSE file will be installed manually.".bold().yellow());
     };
 
-    args.action.exec(&args.output_folder, &config, licenses.as_ref())
+    args.action
+        .exec(&args.output_folder, &config, licenses.as_ref())
 }
 
 /// The path to the `LICENSE` file.
