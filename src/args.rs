@@ -34,9 +34,7 @@ pub enum CargoAurActions {
         musl: bool,
     },
     #[clap(alias = "g")]
-    Generate {
-        input: String,
-    },
+    Generate { input: PathBuf },
 }
 
 pub fn get_args() -> CargoAurArgs {
@@ -47,7 +45,11 @@ impl CargoAurActions {
     pub fn exec(&self, output: &PathBuf, config: &Config, licenses: &[DirEntry]) -> CargoAurResult {
         let generated_file = match self {
             CargoAurActions::Build { musl } => build_package(*musl, output, config, licenses)?,
-            CargoAurActions::Generate { input } => input.clone(),
+            CargoAurActions::Generate { input } => {
+                let file = output.as_path();
+                std::fs::copy(input.as_path(), file.join(input.file_name().unwrap()))?;
+                input.to_str().unwrap_or_default().to_string()
+            }
         };
 
         let ctx_template = SrTemplate::default();
