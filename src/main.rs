@@ -39,6 +39,9 @@ struct Args {
     help: bool,
     /// Display the current version of this software.
     version: bool,
+
+    /// Set custom output directory
+    output: Option<String>,
     /// Unused.
     #[options(free)]
     args: Vec<String>,
@@ -176,9 +179,9 @@ struct Binary {
 
 impl Package {
     /// The name of the tarball that should be produced from this `Package`.
-    fn tarball(&self) -> String {
+    fn tarball(&self, output: &str) -> String {
         format!(
-            "target/cargo-aur/{}-{}-x86_64.tar.gz",
+            "{output}/{}-{}-x86_64.tar.gz",
             self.name, self.version
         )
     }
@@ -217,10 +220,12 @@ fn work(args: Args) -> Result<(), Error> {
         p("Checking for musl toolchain...".bold());
         musl_check()?
     }
+    
+    let output = args.output.unwrap_or("target/cargo-aur".to_string());
 
     // Ensure the target can actually be written to. Otherwise the `tar`
     // operation later on will fail.
-    std::fs::create_dir_all("target/cargo-aur")?;
+    std::fs::create_dir_all(&output)?;
 
     let config = cargo_config()?;
 
@@ -240,11 +245,11 @@ fn work(args: Args) -> Result<(), Error> {
 
     if args.dryrun.not() {
         release_build(args.musl)?;
-        tarball(args.musl, license.as_ref(), &config)?;
-        let sha256: String = sha256sum(&config.package)?;
+        tarball(args.musl, &output, license.as_ref(), &config)?;
+        let sha256: String = sha256sum(&config.package, &output)?;
 
         // Write the PKGBUILD.
-        let file = BufWriter::new(File::create("target/cargo-aur/PKGBUILD")?);
+        let file = BufWriter::new(File::create(format!("{output}/PKGBUILD"))?);
         pkgbuild(file, &config, &sha256, license.as_ref())?;
     }
 
@@ -361,7 +366,7 @@ fn release_build(musl: bool) -> Result<(), Error> {
     Ok(())
 }
 
-fn tarball(musl: bool, license: Option<&DirEntry>, config: &Config) -> Result<(), Error> {
+fn tarball(musl: bool, output: &str, license: Option<&DirEntry>, config: &Config) -> Result<(), Error> {
     let target_dir: OsString = match std::env::var_os("CARGO_TARGET_DIR") {
         Some(p) => p,
         None => "target".into(),
@@ -386,7 +391,7 @@ fn tarball(musl: bool, license: Option<&DirEntry>, config: &Config) -> Result<()
     let mut command = Command::new("tar");
     command
         .arg("czf")
-        .arg(config.package.tarball())
+        .arg(config.package.tarball(output))
         .arg(binary_name);
     if let Some(lic) = license {
         command.arg(lic.path());
@@ -406,8 +411,8 @@ fn strip(path: &Path) -> Result<(), Error> {
     Ok(()) // FIXME Would love to use my `void` package here and elsewhere.
 }
 
-fn sha256sum(package: &Package) -> Result<String, Error> {
-    let bytes = std::fs::read(package.tarball())?;
+fn sha256sum(package: &Package, output: &str) -> Result<String, Error> {
+    let bytes = std::fs::read(package.tarball(output))?;
     let digest = Hash::hash(&bytes);
     let hex = digest.iter().map(|u| format!("{:02x}", u)).collect();
     Ok(hex)
