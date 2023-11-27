@@ -45,9 +45,6 @@ struct Args {
     version: bool,
     /// Set a custom output directory (default: target/).
     output: Option<PathBuf>,
-    /// Unused.
-    #[options(free)]
-    args: Vec<String>,
     /// Use the MUSL build target to produce a static binary.
     musl: bool,
     /// Don't actually build anything.
