@@ -1,11 +1,10 @@
 //! Independently testable types and functions.
 
 use serde::Deserialize;
-use std::{
-    ops::Not,
-    path::{Path, PathBuf},
-};
+use std::ops::Not;
+use std::path::{Path, PathBuf};
 
+/// The git forge in which a project's source code is stored.
 pub enum GitHost {
     Github,
     Gitlab,
@@ -26,6 +25,7 @@ impl GitHost {
     }
 }
 
+/// The critical fields read from a `Cargo.toml` and rewritten into a PKGBUILD.
 #[derive(Deserialize, Debug)]
 pub struct Package {
     pub name: String,
@@ -68,6 +68,7 @@ impl Package {
 //     }.tarball(Path::new("foobar"))
 // }
 
+/// The `[package.metadata]` TOML block.
 #[derive(Deserialize, Debug)]
 pub struct Metadata {
     /// Deprecated.
@@ -132,6 +133,7 @@ impl std::fmt::Display for Metadata {
     }
 }
 
+/// The inner values of a `[package.metadata.aur]` TOML block.
 #[derive(Deserialize, Debug)]
 pub struct AUR {
     #[serde(default)]
