@@ -1,6 +1,7 @@
 mod error;
 
 use crate::error::Error;
+use cargo_aur::{GitHost, Package};
 use colored::*;
 use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
@@ -39,8 +40,7 @@ struct Args {
     help: bool,
     /// Display the current version of this software.
     version: bool,
-
-    /// Set custom output directory
+    /// Set a custom output directory (default: target/).
     output: Option<PathBuf>,
     /// Unused.
     #[options(free)]
@@ -49,26 +49,6 @@ struct Args {
     musl: bool,
     /// Don't actually build anything.
     dryrun: bool,
-}
-
-enum GitHost {
-    Github,
-    Gitlab,
-}
-
-impl GitHost {
-    fn source(&self, package: &Package) -> String {
-        match self {
-            GitHost::Github => format!(
-                "{}/releases/download/v$pkgver/{}-$pkgver-x86_64.tar.gz",
-                package.repository, package.name
-            ),
-            GitHost::Gitlab => format!(
-                "{}/-/archive/v$pkgver/{}-$pkgver-x86_64.tar.gz",
-                package.repository, package.name
-            ),
-        }
-    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -89,111 +69,8 @@ impl Config {
 }
 
 #[derive(Deserialize, Debug)]
-struct Package {
-    name: String,
-    version: String,
-    authors: Vec<String>,
-    description: String,
-    homepage: String,
-    repository: String,
-    license: String,
-    metadata: Option<Metadata>,
-}
-
-#[derive(Deserialize, Debug)]
-struct Metadata {
-    /// Deprecated.
-    #[serde(default)]
-    depends: Vec<String>,
-    /// Deprecated.
-    #[serde(default)]
-    optdepends: Vec<String>,
-    /// > [package.metadata.aur]
-    aur: Option<AUR>,
-}
-
-#[derive(Deserialize, Debug)]
-struct AUR {
-    #[serde(default)]
-    depends: Vec<String>,
-    #[serde(default)]
-    optdepends: Vec<String>,
-}
-
-impl std::fmt::Display for Metadata {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Reconcile which section to read extra dependency information from.
-        // The format we hope the user is using is:
-        //
-        // > [package.metadata.aur]
-        //
-        // But version 1.5 originally supported:
-        //
-        // > [package.metadata]
-        //
-        // To avoid a sudden breakage for users, we support both definition
-        // locations but favour the newer one.
-        //
-        // We print a warning to the user elsewhere if they're still using the
-        // old way.
-        let (deps, opts) = if let Some(aur) = self.aur.as_ref() {
-            (aur.depends.as_slice(), aur.optdepends.as_slice())
-        } else {
-            (self.depends.as_slice(), self.optdepends.as_slice())
-        };
-
-        match deps {
-            [middle @ .., last] => {
-                write!(f, "depends=(")?;
-                for item in middle {
-                    write!(f, "\"{}\" ", item)?;
-                }
-                if opts.is_empty().not() {
-                    writeln!(f, "\"{}\")", last)?;
-                } else {
-                    write!(f, "\"{}\")", last)?;
-                }
-            }
-            [] => {}
-        }
-
-        match opts {
-            [middle @ .., last] => {
-                write!(f, "optdepends=(")?;
-                for item in middle {
-                    write!(f, "\"{}\" ", item)?;
-                }
-                write!(f, "\"{}\")", last)?;
-            }
-            [] => {}
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Deserialize, Debug)]
 struct Binary {
     name: String,
-}
-
-impl Package {
-    /// The name of the tarball that should be produced from this `Package`.
-    fn tarball(&self, output: &PathBuf) -> String {
-        let mut output = output.clone();
-        output.push(format!("{}-{}-x86_64.tar.gz", self.name, self.version));
-        output.to_str().unwrap().to_string()
-    }
-
-    fn git_host(&self) -> Option<GitHost> {
-        if self.repository.starts_with("https://github") {
-            Some(GitHost::Github)
-        } else if self.repository.starts_with("https://gitlab") {
-            Some(GitHost::Gitlab)
-        } else {
-            None
-        }
-    }
 }
 
 fn main() -> ExitCode {
