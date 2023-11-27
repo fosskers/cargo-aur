@@ -6,15 +6,11 @@ use colored::*;
 use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
 use serde::Deserialize;
-use std::ffi::OsString;
 use std::fs::{DirEntry, File};
 use std::io::{BufWriter, Write};
 use std::ops::Not;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
-
-/// The default output target. PKGBUILDs, etc., are written here.
-const DEFAULT_TARGET: &str = "target/cargo-aur";
 
 /// Licenses available from the Arch Linux `licenses` package.
 ///
@@ -97,7 +93,15 @@ fn work(args: Args) -> Result<(), Error> {
         musl_check()?
     }
 
-    let output = args.output.unwrap_or(PathBuf::from(DEFAULT_TARGET));
+    // Where cargo expects to read and write to. By default we want to read the
+    // built binary from `target/release` and we want to write our results to
+    // `target/cargo-aur`, but these are configurable by the user.
+    let cargo_target: PathBuf = match std::env::var_os("CARGO_TARGET_DIR") {
+        Some(p) => PathBuf::from(p),
+        None => PathBuf::from("target"),
+    };
+
+    let output = args.output.unwrap_or(cargo_target.join("cargo-aur"));
 
     // Ensure the target can actually be written to. Otherwise the `tar`
     // operation later on will fail.
@@ -121,7 +125,7 @@ fn work(args: Args) -> Result<(), Error> {
 
     if args.dryrun.not() {
         release_build(args.musl)?;
-        tarball(args.musl, &output, license.as_ref(), &config)?;
+        tarball(args.musl, &cargo_target, &output, license.as_ref(), &config)?;
         let sha256: String = sha256sum(&config.package, &output)?;
 
         // Write the PKGBUILD.
@@ -133,7 +137,11 @@ fn work(args: Args) -> Result<(), Error> {
     Ok(())
 }
 
+/// Read the `Cargo.toml` for all the fields of concern to this tool.
 fn cargo_config() -> Result<Config, Error> {
+    // NOTE 2023-11-27 Yes it looks silly to be reading the whole thing into a
+    // string here, but the `toml` library doesn't allow deserialization from
+    // anything else but a string.
     let content = std::fs::read_to_string("Cargo.toml")?;
     let proj: Config = toml::from_str(&content)?;
     Ok(proj)
@@ -245,15 +253,11 @@ fn release_build(musl: bool) -> Result<(), Error> {
 
 fn tarball(
     musl: bool,
+    cargo_target: &Path,
     output: &Path,
     license: Option<&DirEntry>,
     config: &Config,
 ) -> Result<(), Error> {
-    let target_dir: OsString = match std::env::var_os("CARGO_TARGET_DIR") {
-        Some(p) => p,
-        None => "target".into(),
-    };
-
     let release_dir = if musl {
         "x86_64-unknown-linux-musl/release"
     } else {
@@ -261,9 +265,7 @@ fn tarball(
     };
 
     let binary_name = config.binary_name();
-    let mut binary: PathBuf = target_dir.into();
-    binary.push(release_dir);
-    binary.push(binary_name);
+    let binary = cargo_target.join(release_dir).join(binary_name);
 
     strip(&binary)?;
     std::fs::copy(binary, binary_name)?;

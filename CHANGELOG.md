@@ -1,5 +1,12 @@
 # `cargo-aur` Changelog
 
+## Unreleased
+
+#### Added
+
+- The `--output` flag for customizing the location of the output produced by
+  `cargo aur`. If unused, the default remains `target/cargo-aur/`.
+
 ## 1.6.0 (2023-10-02)
 
 #### Changed
@@ -7,7 +14,7 @@
 - The `[package.metadata]` section for adding extra dependency information
   should now be named `[package.metadata.aur]`. The old syntax will still work,
   but you will be warned. This fixes a conflict with other `cargo` subcommands.
-- The PKGBUILD and tarball are now output to `target/cargo-aur` to avoid
+- The PKGBUILD and tarball are now output to `target/cargo-aur/` to avoid
   cluttering the top-level of the repo.
 - Reduced binary size.
 
