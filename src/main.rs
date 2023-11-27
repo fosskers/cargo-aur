@@ -13,6 +13,9 @@ use std::ops::Not;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
+/// The default output target. PKGBUILDs, etc., are written here.
+const DEFAULT_TARGET: &str = "target/cargo-aur";
+
 /// Licenses available from the Arch Linux `licenses` package.
 ///
 /// That package contains other licenses, but I've excluded here those unlikely
@@ -97,7 +100,7 @@ fn work(args: Args) -> Result<(), Error> {
         musl_check()?
     }
 
-    let output = args.output.unwrap_or(PathBuf::from("target/cargo-aur"));
+    let output = args.output.unwrap_or(PathBuf::from(DEFAULT_TARGET));
 
     // Ensure the target can actually be written to. Otherwise the `tar`
     // operation later on will fail.
@@ -125,12 +128,9 @@ fn work(args: Args) -> Result<(), Error> {
         let sha256: String = sha256sum(&config.package, &output)?;
 
         // Write the PKGBUILD.
-        {
-            let mut output = output.clone();
-            output.push("PKGBUILD");
-            let file = BufWriter::new(File::create(&output)?);
-            pkgbuild(file, &config, &sha256, license.as_ref())?;
-        }
+        let path = output.join("PKGBUILD");
+        let file = BufWriter::new(File::create(&path)?);
+        pkgbuild(file, &config, &sha256, license.as_ref())?;
     }
 
     Ok(())
@@ -248,7 +248,7 @@ fn release_build(musl: bool) -> Result<(), Error> {
 
 fn tarball(
     musl: bool,
-    output: &PathBuf,
+    output: &Path,
     license: Option<&DirEntry>,
     config: &Config,
 ) -> Result<(), Error> {
@@ -296,7 +296,7 @@ fn strip(path: &Path) -> Result<(), Error> {
     Ok(()) // FIXME Would love to use my `void` package here and elsewhere.
 }
 
-fn sha256sum(package: &Package, output: &PathBuf) -> Result<String, Error> {
+fn sha256sum(package: &Package, output: &Path) -> Result<String, Error> {
     let bytes = std::fs::read(package.tarball(output))?;
     let digest = Hash::hash(&bytes);
     let hex = digest.iter().map(|u| format!("{:02x}", u)).collect();
