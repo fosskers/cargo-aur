@@ -202,7 +202,7 @@ where
     writeln!(file, "pkgver={}", package.version)?;
     writeln!(file, "pkgrel=1")?;
     writeln!(file, "pkgdesc=\"{}\"", package.description)?;
-    writeln!(file, "url=\"{}\"", package.homepage)?;
+    writeln!(file, "url=\"{}\"", package.url())?;
     writeln!(file, "license=(\"{}\")", package.license)?;
     writeln!(file, "arch=(\"x86_64\")")?;
     writeln!(file, "provides=(\"{}\")", package.name)?;

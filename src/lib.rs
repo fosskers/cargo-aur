@@ -32,10 +32,11 @@ pub struct Package {
     pub version: String,
     pub authors: Vec<String>,
     pub description: String,
-    pub homepage: String,
     pub repository: String,
     pub license: String,
     pub metadata: Option<Metadata>,
+    pub homepage: Option<String>,
+    pub documentation: Option<String>
 }
 
 impl Package {
@@ -51,6 +52,17 @@ impl Package {
             Some(GitHost::Gitlab)
         } else {
             None
+        }
+    }
+
+    /// Fetch the package URL from its `homepage`, `documentation` or `repository` field.
+    pub fn url(&self) -> &str {
+        if let Some(url) = &self.homepage {
+            url
+        } else if let Some(url) = &self.documentation {
+            url
+        } else {
+            &self.repository
         }
     }
 }
