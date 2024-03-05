@@ -26,5 +26,5 @@ codegen-units = 1
 panic = "abort"
 
 [package.metadata.aur]
-depends = ["blah"]
-files = [["/path/to/original", "/path/to/target"]]
+# depends = ["blah"]
+# files = [[".github/dependabot.yml", "$pkgdir/usr/local/share/cargo-aur/dependabot.yml"]]

@@ -289,6 +289,17 @@ fn tarball(
     if let Some(lic) = license {
         command.arg(lic.path());
     }
+    if let Some(files) = config
+        .package
+        .metadata
+        .as_ref()
+        .and_then(|m| m.aur.as_ref())
+        .map(|a| a.files.as_slice())
+    {
+        for (file, _) in files {
+            command.arg(file);
+        }
+    }
     command.status()?;
 
     std::fs::remove_file(binary_name)?;
