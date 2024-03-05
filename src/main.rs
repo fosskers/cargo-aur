@@ -130,7 +130,7 @@ fn work(args: Args) -> Result<(), Error> {
 
         // Write the PKGBUILD.
         let path = output.join("PKGBUILD");
-        let file = BufWriter::new(File::create(&path)?);
+        let file = BufWriter::new(File::create(path)?);
         pkgbuild(file, &config, &sha256, license.as_ref())?;
     }
 

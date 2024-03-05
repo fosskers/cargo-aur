@@ -36,7 +36,7 @@ pub struct Package {
     pub license: String,
     pub metadata: Option<Metadata>,
     pub homepage: Option<String>,
-    pub documentation: Option<String>
+    pub documentation: Option<String>,
 }
 
 impl Package {
@@ -55,15 +55,13 @@ impl Package {
         }
     }
 
-    /// Fetch the package URL from its `homepage`, `documentation` or `repository` field.
+    /// Fetch the package URL from its `homepage`, `documentation` or
+    /// `repository` field.
     pub fn url(&self) -> &str {
-        if let Some(url) = &self.homepage {
-            url
-        } else if let Some(url) = &self.documentation {
-            url
-        } else {
-            &self.repository
-        }
+        self.homepage
+            .as_deref()
+            .or(self.documentation.as_deref())
+            .unwrap_or(&self.repository)
     }
 }
 
