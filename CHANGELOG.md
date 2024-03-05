@@ -6,6 +6,17 @@
 
 - The `--output` flag for customizing the location of the output produced by
   `cargo aur`. If unused, the default remains `target/cargo-aur/`.
+- A new `files` field in `[package.metadata.aur]`, which accepts a list-of-pairs
+  of additional files you want copied to the user's filesystem upon package
+  installation. Output looks like:
+
+```
+package() {
+    install -Dm755 cargo-aur -t "$pkgdir/usr/bin"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 "/path/to/original" "/path/to/target"
+}
+```
 
 #### Fixed
 

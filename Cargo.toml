@@ -24,3 +24,7 @@ strip = true
 opt-level = "z"
 codegen-units = 1
 panic = "abort"
+
+[package.metadata.aur]
+depends = ["blah"]
+files = [["/path/to/original", "/path/to/target"]]

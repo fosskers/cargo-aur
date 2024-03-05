@@ -91,6 +91,18 @@ pub struct Metadata {
     pub aur: Option<AUR>,
 }
 
+impl Metadata {
+    /// The metadata block actually has some contents.
+    pub fn non_empty(&self) -> bool {
+        self.depends.is_empty().not()
+            || self.optdepends.is_empty().not()
+            || self
+                .aur
+                .as_ref()
+                .is_some_and(|aur| aur.depends.is_empty().not() || aur.optdepends.is_empty().not())
+    }
+}
+
 impl std::fmt::Display for Metadata {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Reconcile which section to read extra dependency information from.
@@ -150,4 +162,6 @@ pub struct AUR {
     depends: Vec<String>,
     #[serde(default)]
     optdepends: Vec<String>,
+    #[serde(default)]
+    pub files: Vec<(String, String)>,
 }

@@ -208,8 +208,11 @@ where
     writeln!(file, "provides=(\"{}\")", package.name)?;
     writeln!(file, "conflicts=(\"{}\")", package.name)?;
 
-    if let Some(metadata) = package.metadata.as_ref() {
-        writeln!(file, "{}", metadata)?;
+    match package.metadata.as_ref() {
+        Some(metadata) if metadata.non_empty() => {
+            writeln!(file, "{}", metadata)?;
+        }
+        Some(_) | None => {}
     }
 
     writeln!(file, "source=(\"{}\")", source)?;
@@ -232,6 +235,12 @@ where
             "    install -Dm644 {} \"$pkgdir/usr/share/licenses/$pkgname/{}\"",
             file_name, file_name
         )?;
+    }
+
+    if let Some(aur) = package.metadata.as_ref().and_then(|m| m.aur.as_ref()) {
+        for (source, target) in aur.files.iter() {
+            writeln!(file, "    install -Dm644 \"{}\" \"{}\"", source, target)?;
+        }
     }
 
     writeln!(file, "}}")?;
