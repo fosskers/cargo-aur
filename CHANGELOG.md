@@ -14,7 +14,7 @@
 package() {
     install -Dm755 cargo-aur -t "$pkgdir/usr/bin"
     install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
-    install -Dm644 "/path/to/original" "/path/to/target"
+    install -Dm644 "/path/to/original/foo.txt" "$pkgdir/path/to/target/foo.txt"
 }
 ```
 

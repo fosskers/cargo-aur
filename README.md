@@ -83,6 +83,26 @@ optdepends = ["sushi", "ramen"]
 
 And these settings will be copied to your PKGBUILD.
 
+### Including Additional Files
+
+The `files` list can be used to designated initial files to be copied the user's
+filesystem. So this:
+
+```toml
+[package.metadata.aur]
+files = [["path/to/local/foo.txt", "$pkgdir/usr/local/share/your-app/foo.txt"]]
+```
+
+will result in this:
+
+```toml
+package() {
+    install -Dm755 your-app -t "$pkgdir/usr/bin"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 "path/to/local/foo.txt" "$pkgdir/usr/local/share/your-app/foo.txt"
+}
+```
+
 ### Static Binaries
 
 Run with `--musl` to produce a release binary that is statically linked via
