@@ -7,6 +7,10 @@
 - The `--output` flag for customizing the location of the output produced by
   `cargo aur`. If unused, the default remains `target/cargo-aur/`.
 
+#### Fixed
+
+- Supply the `url` from backup sources if `homepage` is not specified in the `Cargo.toml`.
+
 ## 1.6.0 (2023-10-02)
 
 #### Changed
