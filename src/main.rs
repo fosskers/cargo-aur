@@ -239,7 +239,16 @@ where
 
     if let Some(aur) = package.metadata.as_ref().and_then(|m| m.aur.as_ref()) {
         for (source, target) in aur.files.iter() {
-            writeln!(file, "    install -Dm644 \"{}\" \"{}\"", source, target)?;
+            if target.has_root().not() {
+                return Err(Error::TargetNotAbsolute(target.to_path_buf()));
+            } else {
+                writeln!(
+                    file,
+                    "    install -Dm644 \"{}\" \"$pkgdir{}\"",
+                    source.display(),
+                    target.display()
+                )?;
+            }
         }
     }
 

@@ -27,4 +27,4 @@ panic = "abort"
 
 [package.metadata.aur]
 # depends = ["blah"]
-# files = [[".github/dependabot.yml", "$pkgdir/usr/local/share/cargo-aur/dependabot.yml"]]
+# files = [[".github/dependabot.yml", "/usr/local/share/cargo-aur/dependabot.yml"]]

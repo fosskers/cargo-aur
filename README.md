@@ -90,7 +90,7 @@ filesystem. So this:
 
 ```toml
 [package.metadata.aur]
-files = [["path/to/local/foo.txt", "$pkgdir/usr/local/share/your-app/foo.txt"]]
+files = [["path/to/local/foo.txt", "/usr/local/share/your-app/foo.txt"]]
 ```
 
 will result in this:

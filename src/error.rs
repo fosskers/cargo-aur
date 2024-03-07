@@ -1,6 +1,6 @@
 //! Errors that can occur in this application.
 
-use std::fmt::Display;
+use std::{fmt::Display, path::PathBuf};
 
 pub(crate) enum Error {
     IO(std::io::Error),
@@ -9,6 +9,7 @@ pub(crate) enum Error {
     Utf8OsString,
     MissingMuslTarget,
     MissingLicense,
+    TargetNotAbsolute(PathBuf),
 }
 
 impl Display for Error {
@@ -24,6 +25,9 @@ impl Display for Error {
             ),
             Error::MissingLicense => {
                 write!(f, "Missing LICENSE file. See https://choosealicense.com/")
+            }
+            Error::TargetNotAbsolute(p) => {
+                write!(f, "Target filepath is not absolute: {}", p.display())
             }
         }
     }
