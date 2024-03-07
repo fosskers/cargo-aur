@@ -1,6 +1,6 @@
 # `cargo-aur` Changelog
 
-## Unreleased
+## 1.7.0 (2024-03-07)
 
 #### Added
 
