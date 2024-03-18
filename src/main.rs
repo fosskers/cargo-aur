@@ -45,6 +45,9 @@ struct Args {
     musl: bool,
     /// Don't actually build anything.
     dryrun: bool,
+    /// Absorbs any extra junk arguments.
+    #[options(free)]
+    free: Vec<String>,
 }
 
 #[derive(Deserialize, Debug)]
