@@ -1,5 +1,11 @@
 # `cargo-aur` Changelog
 
+## 1.7.1 (2024-03-18)
+
+#### Fixed
+
+- The crypt startup error `unexpected free argument aur`.
+
 ## 1.7.0 (2024-03-07)
 
 #### Added
