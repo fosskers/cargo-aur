@@ -1,5 +1,14 @@
 # `cargo-aur` Changelog
 
+## Unreleased
+
+#### Added
+
+- A new `custom` field in `[package.metadata.aur]` which accepts a list of
+  strings that will be added as-is to the `package()` function of the PKGBUILD.
+  This allows the user to add specific extra commands to their build process.
+  See the README for more details.
+
 ## 1.7.1 (2024-03-18)
 
 #### Fixed

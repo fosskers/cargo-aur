@@ -103,6 +103,28 @@ package() {
 }
 ```
 
+### Custom commands within `package()`
+
+The `custom` list can be used to add specific commands to the `package()`
+function. This config:
+
+```toml
+[package.metadata.aur]
+custom = ["echo hi"]
+```
+
+yields:
+
+```
+package() {
+    install -Dm755 cargo-aur -t "$pkgdir/usr/bin"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    echo hi
+}
+```
+
+**Note:** Caveat emptor. No attempt is made to verify the injected commands.
+
 ### Static Binaries
 
 Run with `--musl` to produce a release binary that is statically linked via
