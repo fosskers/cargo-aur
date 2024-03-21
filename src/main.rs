@@ -253,6 +253,10 @@ where
                 )?;
             }
         }
+
+        for custom in aur.custom.iter() {
+            writeln!(file, "    {}", custom)?;
+        }
     }
 
     writeln!(file, "}}")?;
