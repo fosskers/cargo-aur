@@ -2,8 +2,8 @@ mod error;
 
 use crate::error::Error;
 use cargo_aur::{GitHost, Package};
+use clap::Parser;
 use colored::*;
-use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
 use serde::Deserialize;
 use std::fs::{DirEntry, File};
@@ -33,21 +33,22 @@ const LICENSES: &[&str] = &[
     "Unlicense", // Not to be confused with "Unlicensed".
 ];
 
-#[derive(Options)]
+#[derive(Parser)]
+#[command(version, about, disable_version_flag = true, long_about = None)]
+/// Prepare Rust projects to be released on the Arch Linux User Repository.
 struct Args {
-    /// Display this help message.
-    help: bool,
-    /// Display the current version of this software.
-    version: bool,
     /// Set a custom output directory (default: target/).
+    #[arg(short, long)]
     output: Option<PathBuf>,
     /// Use the MUSL build target to produce a static binary.
+    #[arg(short, long, default_value_t = false)]
     musl: bool,
     /// Don't actually build anything.
+    #[arg(short, long, default_value_t = false)]
     dryrun: bool,
-    /// Absorbs any extra junk arguments.
-    #[options(free)]
-    free: Vec<String>,
+    /// Print version
+    #[arg(short = 'v', short_alias = 'V', long, action = clap::builder::ArgAction::Version)]
+    version: (),
 }
 
 #[derive(Deserialize, Debug)]
@@ -73,18 +74,16 @@ struct Binary {
 }
 
 fn main() -> ExitCode {
-    let args = Args::parse_args_or_exit(ParsingStyle::AllOptions);
-
-    if args.version {
-        let version = env!("CARGO_PKG_VERSION");
-        println!("{}", version);
-        ExitCode::SUCCESS
-    } else if let Err(e) = work(args) {
-        eprintln!("{} {}: {}", "::".bold(), "Error".bold().red(), e);
-        ExitCode::FAILURE
-    } else {
-        println!("{} {}", "::".bold(), "Done.".bold().green());
-        ExitCode::SUCCESS
+    let args = Args::parse();
+    match work(args) {
+        Ok(()) => {
+            println!("{} {}", "::".bold(), "Done.".bold().green());
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("{} {}: {}", "::".bold(), "Error".bold().red(), e);
+            ExitCode::FAILURE
+        }
     }
 }
 
