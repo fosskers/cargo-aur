@@ -10,7 +10,7 @@ use std::fs::{DirEntry, File};
 use std::io::{BufWriter, Write};
 use std::ops::Not;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode};
+use std::process::{Command, ExitCode, ExitStatus};
 
 /// Licenses available from the Arch Linux `licenses` package.
 ///
@@ -45,9 +45,31 @@ struct Args {
     musl: bool,
     /// Don't actually build anything.
     dryrun: bool,
+    /// Where to obtain the source code for the package.
+    /// `crates-io`: Download the package from `crates.io`.
+    /// `project`: The package is in the current directory.
+    #[options(parse(try_from_str = "parse_source"))]
+    source: Option<Source>,
+    /// Don't build a binary. Instead, create a PKGBUILD that will build from source.
+    no_bin: bool,
     /// Absorbs any extra junk arguments.
     #[options(free)]
     free: Vec<String>,
+}
+
+#[derive(Default)]
+enum Source {
+    CratesIo,
+    #[default]
+    Project,
+}
+
+fn parse_source(input: &str) -> Result<Source, &'static str> {
+    match input {
+        "crates-io" => Ok(Source::CratesIo),
+        "project" => Ok(Source::Project),
+        _ => Err("Invalid source type, expected `crates-io` or `project`"),
+    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -138,6 +160,25 @@ fn work(args: Args) -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+/// Download the `.crate` file from `crates.io`, and
+/// if succesful, return the path of the downloaded file.
+fn download_crate(config: &Config) -> Result<PathBuf, Error> {
+    let pkgname = &config.package.name;
+    let pkgver = &config.package.version;
+    let crate_filename: PathBuf = format!("{pkgname}-{pkgver}.tar.gz").into();
+    let crate_url = format!("https://static.crates.io/crates/{pkgname}/{pkgname}-{pkgver}.crate");
+    let success = Command::new("curl")
+        .arg("--output")
+        .arg(&crate_filename)
+        .arg(&crate_url)
+        .status()?
+        .success();
+    match success {
+        true => Ok(crate_filename),
+        false => Err(Error::DownloadingCrate { crate_url }),
+    }
 }
 
 /// Read the `Cargo.toml` for all the fields of concern to this tool.

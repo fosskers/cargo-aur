@@ -10,6 +10,7 @@ pub(crate) enum Error {
     MissingMuslTarget,
     MissingLicense,
     TargetNotAbsolute(PathBuf),
+    DownloadingCrate { crate_url: String },
 }
 
 impl Display for Error {
@@ -28,6 +29,12 @@ impl Display for Error {
             }
             Error::TargetNotAbsolute(p) => {
                 write!(f, "Target filepath is not absolute: {}", p.display())
+            }
+            Error::DownloadingCrate { crate_url: url } => {
+                write!(
+                    f,
+                    "Error downloading crate from {crate_url}. Have you published the latest version?"
+                )
             }
         }
     }
