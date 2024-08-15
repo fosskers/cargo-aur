@@ -11,6 +11,16 @@ pub(crate) enum Error {
     MissingLicense,
     TargetNotAbsolute(PathBuf),
     DownloadingCrate { crate_url: String },
+    ExtractingCrate { crate_filename: PathBuf },
+    Compressing,
+}
+
+impl std::error::Error for Error {}
+
+impl std::fmt::Debug for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self, f)
+    }
 }
 
 impl Display for Error {
@@ -30,11 +40,17 @@ impl Display for Error {
             Error::TargetNotAbsolute(p) => {
                 write!(f, "Target filepath is not absolute: {}", p.display())
             }
-            Error::DownloadingCrate { crate_url: url } => {
+            Error::DownloadingCrate { crate_url } => {
                 write!(
                     f,
                     "Error downloading crate from {crate_url}. Have you published the latest version?"
                 )
+            }
+            Error::ExtractingCrate { crate_filename } => {
+                write!(f, "Error etracting crate from {:?}.", crate_filename)
+            }
+            Error::Compressing => {
+                write!(f, "Error compressing crate to .tar.gz")
             }
         }
     }

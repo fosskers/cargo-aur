@@ -26,7 +26,7 @@ impl GitHost {
 }
 
 /// The critical fields read from a `Cargo.toml` and rewritten into a PKGBUILD.
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, PartialEq)]
 pub struct Package {
     pub name: String,
     pub version: String,
@@ -79,7 +79,7 @@ impl Package {
 // }
 
 /// The `[package.metadata]` TOML block.
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, PartialEq)]
 pub struct Metadata {
     /// Deprecated.
     #[serde(default)]
@@ -156,7 +156,7 @@ impl std::fmt::Display for Metadata {
 }
 
 /// The inner values of a `[package.metadata.aur]` TOML block.
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, PartialEq)]
 pub struct AUR {
     #[serde(default)]
     depends: Vec<String>,
