@@ -120,14 +120,13 @@ impl<'a> CrateFile<'a> {
 
 impl<'a> BuiltCrate<'a> {
     /// Create a tarball of the built crate in the `cargo_target` directory.
-    pub fn tarball(self, cargo_target: &Path, license: Option<&DirEntry>) -> Result<(), Error> {
-        super::tarball(
-            self.musl,
-            cargo_target,
-            self.crate_file_prefix.as_ref(),
-            license,
-            self.config,
-        )?;
+    pub fn tarball(
+        self,
+        cargo_target: &Path,
+        output: &Path,
+        license: Option<&DirEntry>,
+    ) -> Result<(), Error> {
+        super::tarball(self.musl, cargo_target, output, license, self.config)?;
         Ok(())
     }
 }
@@ -210,10 +209,15 @@ mod tests {
             Some(p) => PathBuf::from(p),
             None => PathBuf::from("target"),
         };
+        let output = cargo_target.join("cargo-aur");
         // This will not likely work for a crate... sorry =(
+        todo!("Check license worked correctly");
         let license = Some(crate::license_file().unwrap());
+        // Ensure the target can actually be written to. Otherwise the `tar`
+        // operation later on will fail.
+        std::fs::create_dir_all(&output).unwrap();
         build
-            .tarball(&cargo_target, license.as_ref())
+            .tarball(&cargo_target, &output, license.as_ref())
             .expect("Expected tarball to succeed");
     }
 }
