@@ -1,4 +1,4 @@
-use crate::{error::Error, p, Config};
+use crate::{error::Error, license_file, p, Config};
 use colored::Colorize;
 use hmac_sha256::Hash;
 use std::{
@@ -82,6 +82,38 @@ impl<'a> CrateFile<'a> {
         });
         Ok(hex)
     }
+    /// Check to see if the license needs to be installed.
+    /// If so, extract the crate, and get the relative path of the LICENSE file
+    /// So that we know what 'install' command to run in the PKGBUILD.
+    pub fn get_license(&self) -> Result<Option<DirEntry>, Error> {
+        let license = if crate::must_copy_license(&self.config.package.license) {
+            p("LICENSE file will be installed manually.".bold().yellow());
+            Some(self.license_file()?)
+        } else {
+            None
+        };
+        Ok(license)
+    }
+    /// Extract the crate, and get the relative path of the LICENSE file
+    fn license_file(&self) -> Result<DirEntry, Error> {
+        let crate_filename =
+            PathBuf::from(&self.crate_file_prefix).with_extension(self.crate_file_extension);
+        if !Command::new("tar")
+            .current_dir(self.tempdir_handle.as_ref())
+            .arg("-xvzf")
+            .arg(&crate_filename)
+            .status()?
+            .success()
+        {
+            return Err(Error::ExtractingCrate { crate_filename });
+        };
+        crate::license_file(Some(
+            self.tempdir_handle
+                .as_ref()
+                .join(&self.crate_file_prefix)
+                .as_ref(),
+        ))
+    }
     /// Build the downloaded crate, and if successful, return a handle to it.
     pub fn build(self, musl: bool) -> Result<BuiltCrate<'a>, Error> {
         let crate_filename =
@@ -120,24 +152,41 @@ impl<'a> CrateFile<'a> {
 
 impl<'a> BuiltCrate<'a> {
     /// Create a tarball of the built crate in the `cargo_target` directory.
-    pub fn tarball(
-        self,
-        cargo_target: &Path,
-        output: &Path,
-        license: Option<&DirEntry>,
-    ) -> Result<(), Error> {
-        super::tarball(self.musl, cargo_target, output, license, self.config)?;
-        Ok(())
+    /// Returns a reference to the path of the LICENSE file inside the
+    /// tarball - it won't simply be ./LICENSE.
+    pub fn tarball(self, cargo_target: &Path, output: &Path) -> Result<Option<DirEntry>, Error> {
+        let license = if crate::must_copy_license(&self.config.package.license) {
+            p("LICENSE file will be installed manually.".bold().yellow());
+            Some(self.license_file()?)
+        } else {
+            None
+        };
+        super::tarball(
+            self.musl,
+            cargo_target,
+            output,
+            license.as_ref(),
+            self.config,
+        )?;
+        Ok(license)
+    }
+    /// Get the path to the first file with a name starting with LICENSE in the current directory.
+    fn license_file(&self) -> Result<DirEntry, Error> {
+        crate::license_file(Some(
+            self.tempdir_handle
+                .as_ref()
+                .join(&self.crate_file_prefix)
+                .as_ref(),
+        ))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use super::CrateFile;
     use crate::Config;
     use cargo_aur::Package;
+    use std::path::PathBuf;
     /// Download a simple and also popular crate and check the sha256sums.
     #[test]
     fn test_sha256() {
@@ -210,14 +259,11 @@ mod tests {
             None => PathBuf::from("target"),
         };
         let output = cargo_target.join("cargo-aur");
-        // This will not likely work for a crate... sorry =(
-        todo!("Check license worked correctly");
-        let license = Some(crate::license_file().unwrap());
         // Ensure the target can actually be written to. Otherwise the `tar`
         // operation later on will fail.
         std::fs::create_dir_all(&output).unwrap();
         build
-            .tarball(&cargo_target, &output, license.as_ref())
+            .tarball(&cargo_target, &output)
             .expect("Expected tarball to succeed");
     }
 }

@@ -143,35 +143,44 @@ fn work(args: Args) -> Result<(), Error> {
         }
     }
 
-    let license = if must_copy_license(&config.package.license) {
-        p("LICENSE file will be installed manually.".bold().yellow());
-        Some(license_file()?)
-    } else {
-        None
-    };
-
     if args.dryrun.not() {
         let source = args.source.unwrap_or_default();
-        let sha256 = match (source, args.no_bin) {
+        let (sha256, license) = match (source, args.no_bin) {
             (Source::CratesIo, true) => {
                 let crate_file = crates::CrateFile::download_new(&config)?;
-                crate_file.get_sha256sum()?
+                let sha256 = crate_file.get_sha256sum()?;
+                let license = crate_file.get_license()?;
+                (sha256, license)
             }
             (Source::CratesIo, false) => {
                 let crate_file = crates::CrateFile::download_new(&config)?;
                 let built_crate_file = crate_file.build(args.musl)?;
-                todo!("Confirm correct configuration for sha256 function");
-                sha256sum(&config.package, &output)?
+                let license = built_crate_file.tarball(&cargo_target, &output)?;
+                let sha256 = sha256sum(&config.package, &output)?;
+                (sha256, license)
             }
             (Source::Project, true) => {
-                todo!("Tarball project directory");
-                todo!("Confirm correct configuration for sha256 function");
-                sha256sum(&config.package, &output)?
+                source_tarball(&cargo_target, &output, &config)?;
+                let license = if must_copy_license(&config.package.license) {
+                    p("LICENSE file will be installed manually.".bold().yellow());
+                    Some(license_file(None)?)
+                } else {
+                    None
+                };
+                let sha256 = sha256sum(&config.package, &output)?;
+                (sha256, license)
             }
             (Source::Project, false) => {
                 release_build(args.musl)?;
+                let license = if must_copy_license(&config.package.license) {
+                    p("LICENSE file will be installed manually.".bold().yellow());
+                    Some(license_file(None)?)
+                } else {
+                    None
+                };
                 tarball(args.musl, &cargo_target, &output, license.as_ref(), &config)?;
-                sha256sum(&config.package, &output)?
+                let sha256 = sha256sum(&config.package, &output)?;
+                (sha256, license)
             }
         };
 
@@ -210,8 +219,11 @@ fn must_copy_license(license: &str) -> bool {
 }
 
 /// The path to the `LICENSE` file.
-fn license_file() -> Result<DirEntry, Error> {
-    std::fs::read_dir(".")?
+/// First parameter sets the directory to search for it, or if None, it will
+/// utilise the current directory.
+fn license_file(change_dir_to: Option<&Path>) -> Result<DirEntry, Error> {
+    let path = change_dir_to.unwrap_or(Path::new("."));
+    std::fs::read_dir(path)?
         .filter_map(|entry| entry.ok())
         .find(|entry| {
             entry
@@ -328,6 +340,22 @@ fn release_build(musl: bool) -> Result<(), Error> {
 
     p("Running release build...".bold());
     Command::new("cargo").args(args).status()?;
+    Ok(())
+}
+
+/// Build a source tarball from the current (project) directory.
+fn source_tarball(cargo_target: &Path, output: &Path, config: &Config) -> Result<(), Error> {
+    let args = ["publish", "--dry-run", "--allow-dirty"];
+    let status = Command::new("cargo").args(args).status()?;
+    if !status.success() {
+        return Err(Error::Compressing);
+    };
+    let pkgname = &config.package.name;
+    let pkgver = &config.package.version;
+    let crate_file_name = format!("{pkgname}-{pkgver}.crate");
+    let crate_location = cargo_target.join("package").join(crate_file_name);
+    let new_crate_location = config.package.tarball(output);
+    std::fs::rename(crate_location, new_crate_location)?;
     Ok(())
 }
 
