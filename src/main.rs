@@ -321,16 +321,27 @@ where
         writeln!(file)?;
     }
     writeln!(file, "package() {{")?;
-    // .crate files built by `cargo publish` contain an inner
-    // folder that we need to cd into.
-    if no_bin {
-        writeln!(file, "    cd $pkgname-$pkgver")?;
-    }
-    writeln!(
-        file,
-        "    install -Dm755 {} -t \"$pkgdir/usr/bin\"",
-        config.binary_name()
-    )?;
+    // Install command for binary differs depending on bin/no_bin.
+    match no_bin {
+        true => {
+            // .crate files built by `cargo publish` contain an inner
+            // folder that we need to cd into.
+            writeln!(file, "    cd $pkgname-$pkgver")?;
+            // When building from source, binary will be in the target/release directory.
+            writeln!(
+                file,
+                "    install -Dm755 target/release/{} -t \"$pkgdir/usr/bin\"",
+                config.binary_name()
+            )?;
+        }
+        false => {
+            writeln!(
+                file,
+                "    install -Dm755 {} -t \"$pkgdir/usr/bin\"",
+                config.binary_name()
+            )?;
+        }
+    };
 
     if let Some(lic) = license {
         let file_name = lic
