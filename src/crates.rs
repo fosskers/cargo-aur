@@ -1,4 +1,4 @@
-use crate::{error::Error, license_file, p, Config};
+use crate::{error::Error, p, Config};
 use colored::Colorize;
 use hmac_sha256::Hash;
 use std::{
