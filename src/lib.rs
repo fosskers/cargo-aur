@@ -11,14 +11,18 @@ pub enum GitHost {
 }
 
 impl GitHost {
-    pub fn source(&self, package: &Package) -> String {
+    pub fn source(&self, package: &Package, no_bin: bool) -> String {
+        let platform_identifier = match no_bin {
+            true => "",
+            false => "-x86_64",
+        };
         match self {
             GitHost::Github => format!(
-                "{}/releases/download/v$pkgver/{}-$pkgver-x86_64.tar.gz",
+                "{}/releases/download/v$pkgver/{}-$pkgver{platform_identifier}.tar.gz",
                 package.repository, package.name
             ),
             GitHost::Gitlab => format!(
-                "{}/-/archive/v$pkgver/{}-$pkgver-x86_64.tar.gz",
+                "{}/-/archive/v$pkgver/{}-$pkgver{platform_identifier}.tar.gz",
                 package.repository, package.name
             ),
         }

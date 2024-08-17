@@ -254,10 +254,13 @@ where
         .map(|a| format!("# Maintainer: {}", a))
         .collect::<Vec<_>>()
         .join("\n");
-    let source = package
-        .git_host()
-        .unwrap_or(GitHost::Github)
-        .source(&config.package);
+    let source: Cow<str> = match (source_type, no_bin) {
+        (Source::Project, _) | (Source::CratesIo, false) => package
+            .git_host()
+            .unwrap_or(GitHost::Github)
+            .source(&config.package, no_bin).into(),
+        (Source::CratesIo, true) => "$pkgname-$pkgver.tar.gz::https://static.crates.io/crates/$pkgname/$pkgname-$pkgver.crate".into(),
+    };
     let pkgname: Cow<str> = match no_bin {
         true => package.name.as_str().into(),
         false => format!("{}-bin", package.name).into(),
@@ -292,7 +295,36 @@ where
     writeln!(file, "source=(\"{}\")", source)?;
     writeln!(file, "sha256sums=(\"{}\")", sha256)?;
     writeln!(file)?;
+    // Include the prepare, build and check steps for non-binary package.
+    if source_type == Source::CratesIo && no_bin {
+        writeln!(file, "prepare() {{")?;
+        writeln!(file, "    cd $pkgname-$pkgver")?;
+        writeln!(file, "    export RUSTUP_TOOLCHAIN=stable")?;
+        writeln!(
+            file,
+            "    cargo fetch --locked --target \"$(rustc -vV | sed -n 's/host: //p')\""
+        )?;
+        writeln!(file, "}}")?;
+        writeln!(file)?;
+        writeln!(file, "build() {{")?;
+        writeln!(file, "    cd $pkgname-$pkgver")?;
+        writeln!(file, "    export RUSTUP_TOOLCHAIN=stable")?;
+        writeln!(file, "    export CARGO_TARGET_DIR=target")?;
+        writeln!(file, "    cargo build --frozen --release --all-features")?;
+        writeln!(file, "}}")?;
+        writeln!(file)?;
+        writeln!(file, "check() {{")?;
+        writeln!(file, "    cd $pkgname-$pkgver")?;
+        writeln!(file, "    export RUSTUP_TOOLCHAIN=stable")?;
+        writeln!(file, "    cargo test --frozen --all-features")?;
+        writeln!(file, "}}")?;
+        writeln!(file)?;
+    }
     writeln!(file, "package() {{")?;
+    // .crate files contain an inner folder that we need to cd into.
+    if source_type == Source::CratesIo && no_bin {
+        writeln!(file, "    cd $pkgname-$pkgver")?;
+    }
     writeln!(
         file,
         "    install -Dm755 {} -t \"$pkgdir/usr/bin\"",
@@ -344,6 +376,7 @@ fn release_build(musl: bool) -> Result<(), Error> {
 }
 
 /// Build a source tarball from the current (project) directory.
+/// Utilises `cargo --publish --dry-run` under the hood to do the packaging.
 fn source_tarball(cargo_target: &Path, output: &Path, config: &Config) -> Result<(), Error> {
     let args = ["publish", "--dry-run", "--allow-dirty"];
     let status = Command::new("cargo").args(args).status()?;
@@ -386,7 +419,11 @@ fn tarball(
         .arg(config.package.tarball(output))
         .arg(binary_name);
     if let Some(lic) = license {
-        command.arg(lic.path());
+        // NOTE: -C is required, as license may not be in the current directory,
+        // but we want it to end up at the root of the tarball.
+        command.arg("-C");
+        command.arg(lic.path().with_file_name(""));
+        command.arg(lic.file_name());
     }
     if let Some(files) = config
         .package
