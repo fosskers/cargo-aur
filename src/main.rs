@@ -296,7 +296,7 @@ where
     writeln!(file, "sha256sums=(\"{}\")", sha256)?;
     writeln!(file)?;
     // Include the prepare, build and check steps for non-binary package.
-    if source_type == Source::CratesIo && no_bin {
+    if no_bin {
         writeln!(file, "prepare() {{")?;
         writeln!(file, "    cd $pkgname-$pkgver")?;
         writeln!(file, "    export RUSTUP_TOOLCHAIN=stable")?;
@@ -321,8 +321,9 @@ where
         writeln!(file)?;
     }
     writeln!(file, "package() {{")?;
-    // .crate files contain an inner folder that we need to cd into.
-    if source_type == Source::CratesIo && no_bin {
+    // .crate files built by `cargo publish` contain an inner
+    // folder that we need to cd into.
+    if no_bin {
         writeln!(file, "    cd $pkgname-$pkgver")?;
     }
     writeln!(
