@@ -187,7 +187,7 @@ mod tests {
     use crate::Config;
     use cargo_aur::Package;
     use std::path::PathBuf;
-    /// Download a simple and also popular crate and check the sha256sums.
+    /// Download a crate and check the sha256sums against the expected value.
     #[test]
     fn test_sha256() {
         let package = Package {
@@ -259,8 +259,8 @@ mod tests {
             None => PathBuf::from("target"),
         };
         let output = cargo_target.join("cargo-aur");
-        // Ensure the target can actually be written to. Otherwise the `tar`
-        // operation later on will fail.
+        // Ensure the target folder exists. Otherwise the `tar` operation
+        // will fail.
         std::fs::create_dir_all(&output).unwrap();
         build
             .tarball(&cargo_target, &output)

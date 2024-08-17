@@ -74,7 +74,7 @@ fn parse_source(input: &str) -> Result<Source, &'static str> {
     }
 }
 
-#[derive(PartialEq, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 struct Config {
     package: Package,
     #[serde(default)]
@@ -91,7 +91,7 @@ impl Config {
     }
 }
 
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Debug)]
 struct Binary {
     name: String,
 }

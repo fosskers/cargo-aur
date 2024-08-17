@@ -12,6 +12,7 @@ pub enum GitHost {
 
 impl GitHost {
     pub fn source(&self, package: &Package, no_bin: bool) -> String {
+        // Expecting binary tarballs to be uploaded with a platform identifier.
         let platform_identifier = match no_bin {
             true => "",
             false => "-x86_64",
@@ -30,7 +31,7 @@ impl GitHost {
 }
 
 /// The critical fields read from a `Cargo.toml` and rewritten into a PKGBUILD.
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Debug)]
 pub struct Package {
     pub name: String,
     pub version: String,
@@ -83,7 +84,7 @@ impl Package {
 // }
 
 /// The `[package.metadata]` TOML block.
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Debug)]
 pub struct Metadata {
     /// Deprecated.
     #[serde(default)]
@@ -160,7 +161,7 @@ impl std::fmt::Display for Metadata {
 }
 
 /// The inner values of a `[package.metadata.aur]` TOML block.
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Debug)]
 pub struct AUR {
     #[serde(default)]
     depends: Vec<String>,
