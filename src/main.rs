@@ -155,7 +155,7 @@ fn work(args: Args) -> Result<(), Error> {
             (Source::CratesIo, false) => {
                 let crate_file = crates::CrateFile::download_new(&config)?;
                 let built_crate_file = crate_file.build(args.musl)?;
-                let license = built_crate_file.tarball(&cargo_target, &output)?;
+                let license = built_crate_file.tarball(&cargo_target)?;
                 let sha256 = sha256sum(&config.package, &output)?;
                 (sha256, license)
             }

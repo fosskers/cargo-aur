@@ -151,19 +151,29 @@ impl<'a> CrateFile<'a> {
 }
 
 impl<'a> BuiltCrate<'a> {
-    /// Create a tarball of the built crate in the `cargo_target` directory.
+    /// Create a tarball of the built crate in the `output` directory.
     /// Returns a reference to the path of the LICENSE file inside the
-    /// tarball - it won't simply be ./LICENSE.
-    pub fn tarball(self, cargo_target: &Path, output: &Path) -> Result<Option<DirEntry>, Error> {
+    /// tarball - it won't always be ./LICENSE.
+    pub fn tarball(self, output: &Path) -> Result<Option<DirEntry>, Error> {
         let license = if crate::must_copy_license(&self.config.package.license) {
             p("LICENSE file will be installed manually.".bold().yellow());
             Some(self.license_file()?)
         } else {
             None
         };
+        // Possible refactor target with super::work
+        let env_cargo_target: PathBuf = match std::env::var_os("CARGO_TARGET_DIR") {
+            Some(p) => PathBuf::from(p),
+            None => PathBuf::from("target"),
+        };
+        let cargo_target = self
+            .tempdir_handle
+            .path()
+            .join(self.crate_file_prefix)
+            .join(env_cargo_target);
         super::tarball(
             self.musl,
-            cargo_target,
+            cargo_target.as_ref(),
             output,
             license.as_ref(),
             self.config,
@@ -262,8 +272,6 @@ mod tests {
         // Ensure the target folder exists. Otherwise the `tar` operation
         // will fail.
         std::fs::create_dir_all(&output).unwrap();
-        build
-            .tarball(&cargo_target, &output)
-            .expect("Expected tarball to succeed");
+        build.tarball(&output).expect("Expected tarball to succeed");
     }
 }
