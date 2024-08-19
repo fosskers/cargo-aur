@@ -192,6 +192,7 @@ mod tests {
     use std::path::PathBuf;
     /// Download a crate and check the sha256sums against the expected value.
     #[test]
+    #[ignore] // Due to side effects
     fn test_sha256() {
         let package = Package {
             name: "cargo-aur".into(),
@@ -216,6 +217,7 @@ mod tests {
     }
     /// Test that the package can build correctly.
     #[test]
+    #[ignore] // Due to side effects
     fn test_build() {
         let package = Package {
             name: "cargo-aur".into(),
@@ -239,6 +241,7 @@ mod tests {
     }
     /// Test that the package can build and tarball correctly.
     #[test]
+    #[ignore] // Due to side effects
     fn test_tarball() {
         let package = Package {
             name: "cargo-aur".into(),
