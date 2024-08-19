@@ -13,10 +13,7 @@ pub enum GitHost {
 impl GitHost {
     pub fn source(&self, package: &Package, no_bin: bool) -> String {
         // Expecting binary tarballs to be uploaded with a platform identifier.
-        let platform_identifier = match no_bin {
-            true => "",
-            false => "-x86_64",
-        };
+        let platform_identifier = if no_bin { "" } else { "-x86_64" };
         match self {
             GitHost::Github => format!(
                 "{}/releases/download/v$pkgver/{}-$pkgver{platform_identifier}.tar.gz",

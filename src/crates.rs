@@ -56,15 +56,15 @@ impl<'a> CrateFile<'a> {
             .arg(&crate_url)
             .status()?
             .success();
-        match success {
-            true => Ok(CrateFile {
-                tempdir_handle,
-                crate_file_prefix,
-                crate_file_extension,
-                config,
-            }),
-            false => Err(Error::DownloadingCrate { crate_url }),
+        if !success {
+            return Err(Error::DownloadingCrate { crate_url });
         }
+        Ok(CrateFile {
+            tempdir_handle,
+            crate_file_prefix,
+            crate_file_extension,
+            config,
+        })
     }
     /// Get the sha256sum for the downloaded .crate file.
     // NOTE: Possibly future refactor target is crate::sha256sum

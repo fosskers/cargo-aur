@@ -261,9 +261,10 @@ where
             .source(&config.package, no_bin).into(),
         (Source::CratesIo, true) => "$pkgname-$pkgver.tar.gz::https://static.crates.io/crates/$pkgname/$pkgname-$pkgver.crate".into(),
     };
-    let pkgname: Cow<str> = match no_bin {
-        true => package.name.as_str().into(),
-        false => format!("{}-bin", package.name).into(),
+    let pkgname: Cow<str> = if no_bin {
+        package.name.as_str().into()
+    } else {
+        format!("{}-bin", package.name).into()
     };
 
     writeln!(file, "{}", authors)?;
@@ -322,25 +323,22 @@ where
     }
     writeln!(file, "package() {{")?;
     // Install command for binary differs depending on bin/no_bin.
-    match no_bin {
-        true => {
-            // .crate files built by `cargo publish` contain an inner
-            // folder that we need to cd into.
-            writeln!(file, "    cd $pkgname-$pkgver")?;
-            // When building from source, binary will be in the target/release directory.
-            writeln!(
-                file,
-                "    install -Dm755 target/release/{} -t \"$pkgdir/usr/bin\"",
-                config.binary_name()
-            )?;
-        }
-        false => {
-            writeln!(
-                file,
-                "    install -Dm755 {} -t \"$pkgdir/usr/bin\"",
-                config.binary_name()
-            )?;
-        }
+    if no_bin {
+        // .crate files built by `cargo publish` contain an inner
+        // folder that we need to cd into.
+        writeln!(file, "    cd $pkgname-$pkgver")?;
+        // When building from source, binary will be in the target/release directory.
+        writeln!(
+            file,
+            "    install -Dm755 target/release/{} -t \"$pkgdir/usr/bin\"",
+            config.binary_name()
+        )?;
+    } else {
+        writeln!(
+            file,
+            "    install -Dm755 {} -t \"$pkgdir/usr/bin\"",
+            config.binary_name()
+        )?;
     };
 
     if let Some(lic) = license {
