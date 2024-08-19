@@ -86,13 +86,9 @@ impl<'a> CrateFile<'a> {
     /// If so, extract the crate, and get the relative path of the LICENSE file
     /// So that we know what 'install' command to run in the PKGBUILD.
     pub fn get_license(&self) -> Result<Option<DirEntry>, Error> {
-        let license = if crate::must_copy_license(&self.config.package.license) {
-            p("LICENSE file will be installed manually.".bold().yellow());
-            Some(self.license_file()?)
-        } else {
-            None
-        };
-        Ok(license)
+        crate::alert_if_must_copy_license(&self.config.package.license)
+            .then(|| self.license_file())
+            .transpose()
     }
     /// Extract the crate, and get the relative path of the LICENSE file
     fn license_file(&self) -> Result<DirEntry, Error> {
@@ -155,12 +151,9 @@ impl<'a> BuiltCrate<'a> {
     /// Returns a reference to the path of the LICENSE file inside the
     /// tarball - it won't always be ./LICENSE.
     pub fn tarball(self, output: &Path) -> Result<Option<DirEntry>, Error> {
-        let license = if crate::must_copy_license(&self.config.package.license) {
-            p("LICENSE file will be installed manually.".bold().yellow());
-            Some(self.license_file()?)
-        } else {
-            None
-        };
+        let license = crate::alert_if_must_copy_license(&self.config.package.license)
+            .then(|| self.license_file())
+            .transpose()?;
         // Possible refactor target with super::work
         let env_cargo_target: PathBuf = match std::env::var_os("CARGO_TARGET_DIR") {
             Some(p) => PathBuf::from(p),

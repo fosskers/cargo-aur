@@ -161,23 +161,17 @@ fn work(args: Args) -> Result<(), Error> {
             }
             (Source::Project, true) => {
                 source_tarball(&cargo_target, &output, &config)?;
-                let license = if must_copy_license(&config.package.license) {
-                    p("LICENSE file will be installed manually.".bold().yellow());
-                    Some(license_file(None)?)
-                } else {
-                    None
-                };
+                let license = alert_if_must_copy_license(&config.package.license)
+                    .then(|| license_file(None))
+                    .transpose()?;
                 let sha256 = sha256sum(&config.package, &output)?;
                 (sha256, license)
             }
             (Source::Project, false) => {
                 release_build(args.musl)?;
-                let license = if must_copy_license(&config.package.license) {
-                    p("LICENSE file will be installed manually.".bold().yellow());
-                    Some(license_file(None)?)
-                } else {
-                    None
-                };
+                let license = alert_if_must_copy_license(&config.package.license)
+                    .then(|| license_file(None))
+                    .transpose()?;
                 tarball(args.musl, &cargo_target, &output, license.as_ref(), &config)?;
                 let sha256 = sha256sum(&config.package, &output)?;
                 (sha256, license)
@@ -208,6 +202,16 @@ fn cargo_config() -> Result<Config, Error> {
     let content = std::fs::read_to_string("Cargo.toml")?;
     let proj: Config = toml::from_str(&content)?;
     Ok(proj)
+}
+
+/// Alert the user if the license must be copied, and then return true
+/// if the user was alerted.
+fn alert_if_must_copy_license(license: &str) -> bool {
+    if must_copy_license(license) {
+        p("LICENSE file will be installed manually.".bold().yellow());
+        return true;
+    }
+    false
 }
 
 /// If a AUR package's license isn't included in `/usr/share/licenses/common/`,
