@@ -90,8 +90,8 @@ impl<'a> CrateFile<'a> {
             .then(|| self.license_file())
             .transpose()
     }
-    /// Extract the crate.
-    fn extract_crate(&self) -> Result<(), Error> {
+    /// Extract the crate, returning the extracted crate's filename.
+    fn extract_crate(&self) -> Result<PathBuf, Error> {
         let crate_filename =
             PathBuf::from(&self.crate_file_prefix).with_extension(self.crate_file_extension);
         if !Command::new("tar")
@@ -103,7 +103,7 @@ impl<'a> CrateFile<'a> {
         {
             return Err(Error::ExtractingCrate { crate_filename });
         };
-        Ok(())
+        Ok(crate_filename)
     }
     /// Extract the crate, and get the relative path of the LICENSE file.
     fn license_file(&self) -> Result<DirEntry, Error> {
@@ -117,7 +117,7 @@ impl<'a> CrateFile<'a> {
     }
     /// Build the downloaded crate, and if successful, return a handle to it.
     pub fn build(self, musl: bool) -> Result<BuiltCrate<'a>, Error> {
-        self.extract_crate()?;
+        let crate_filename = self.extract_crate()?;
         // NOTE: Potential refactor target with `super::release_build`.
         let mut args = vec!["build", "--release"];
         if musl {
