@@ -47,7 +47,11 @@ impl Display for Error {
                 )
             }
             Error::ExtractingCrate { crate_filename } => {
-                write!(f, "Error extracting crate from {:?}.", crate_filename)
+                write!(
+                    f,
+                    "Error extracting crate from {}.",
+                    crate_filename.display()
+                )
             }
             Error::Compressing => {
                 write!(f, "Error compressing crate to .tar.gz")

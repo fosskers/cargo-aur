@@ -16,12 +16,12 @@ impl GitHost {
         let platform_identifier = if no_bin { "" } else { "-x86_64" };
         match self {
             GitHost::Github => format!(
-                "{}/releases/download/v$pkgver/{}-$pkgver{platform_identifier}.tar.gz",
-                package.repository, package.name
+                "{}/releases/download/v$pkgver/{}-$pkgver{}.tar.gz",
+                package.repository, package.name, platform_identifier
             ),
             GitHost::Gitlab => format!(
-                "{}/-/archive/v$pkgver/{}-$pkgver{platform_identifier}.tar.gz",
-                package.repository, package.name
+                "{}/-/archive/v$pkgver/{}-$pkgver{}.tar.gz",
+                package.repository, package.name, platform_identifier
             ),
         }
     }
