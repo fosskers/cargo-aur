@@ -47,31 +47,13 @@ struct Args {
     musl: bool,
     /// Don't actually build anything.
     dryrun: bool,
-    /// Where to obtain the source code for the package.
-    /// `crates-io`: Download the package from `crates.io`.
-    /// `project`: The package is in the current directory.
-    #[options(parse(try_from_str = "parse_source"))]
-    source: Option<Source>,
+    /// Obtain source code from matching crate from `crates.io` instead of the current directory.
+    crates: bool,
     /// Don't build a binary. Instead, create a PKGBUILD that will build from source.
     no_bin: bool,
     /// Absorbs any extra junk arguments.
     #[options(free)]
     free: Vec<String>,
-}
-
-#[derive(Default, Copy, Clone, PartialEq)]
-enum Source {
-    CratesIo,
-    #[default]
-    Project,
-}
-
-fn parse_source(input: &str) -> Result<Source, &'static str> {
-    match input {
-        "crates-io" => Ok(Source::CratesIo),
-        "project" => Ok(Source::Project),
-        _ => Err("Invalid source type, expected `crates-io` or `project`"),
-    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -144,22 +126,21 @@ fn work(args: Args) -> Result<(), Error> {
     }
 
     if args.dryrun.not() {
-        let source = args.source.unwrap_or_default();
-        let (sha256, license) = match (source, args.no_bin) {
-            (Source::CratesIo, true) => {
+        let (sha256, license) = match (args.crates, args.no_bin) {
+            (true, true) => {
                 let crate_file = crates::CrateFile::download_new(&config)?;
                 let sha256 = crate_file.get_sha256sum()?;
                 let license = crate_file.get_license()?;
                 (sha256, license)
             }
-            (Source::CratesIo, false) => {
+            (true, false) => {
                 let crate_file = crates::CrateFile::download_new(&config)?;
                 let built_crate_file = crate_file.build(args.musl)?;
                 let license = built_crate_file.tarball(&cargo_target)?;
                 let sha256 = sha256sum(&config.package, &output)?;
                 (sha256, license)
             }
-            (Source::Project, true) => {
+            (false, true) => {
                 source_tarball(&cargo_target, &output, &config)?;
                 let license = alert_if_must_copy_license(&config.package.license)
                     .then(|| license_file(None))
@@ -167,7 +148,7 @@ fn work(args: Args) -> Result<(), Error> {
                 let sha256 = sha256sum(&config.package, &output)?;
                 (sha256, license)
             }
-            (Source::Project, false) => {
+            (false, false) => {
                 release_build(args.musl)?;
                 let license = alert_if_must_copy_license(&config.package.license)
                     .then(|| license_file(None))
@@ -186,7 +167,7 @@ fn work(args: Args) -> Result<(), Error> {
             &config,
             &sha256,
             license.as_ref(),
-            source,
+            args.crates,
             args.no_bin,
         )?;
     }
@@ -245,7 +226,7 @@ fn pkgbuild<T>(
     config: &Config,
     sha256: &str,
     license: Option<&DirEntry>,
-    source_type: Source,
+    crates: bool,
     no_bin: bool,
 ) -> Result<(), Error>
 where
@@ -258,12 +239,12 @@ where
         .map(|a| format!("# Maintainer: {}", a))
         .collect::<Vec<_>>()
         .join("\n");
-    let source: Cow<str> = match (source_type, no_bin) {
-        (Source::Project, _) | (Source::CratesIo, false) => package
+    let source: Cow<str> = match (crates, no_bin) {
+        (false, _) | (true, false) => package
             .git_host()
             .unwrap_or(GitHost::Github)
             .source(&config.package, no_bin).into(),
-        (Source::CratesIo, true) => "$pkgname-$pkgver.tar.gz::https://static.crates.io/crates/$pkgname/$pkgname-$pkgver.crate".into(),
+        (true, true) => "$pkgname-$pkgver.tar.gz::https://static.crates.io/crates/$pkgname/$pkgname-$pkgver.crate".into(),
     };
     let pkgname: Cow<str> = if no_bin {
         package.name.as_str().into()
