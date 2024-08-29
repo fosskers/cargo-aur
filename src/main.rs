@@ -239,12 +239,16 @@ where
         .map(|a| format!("# Maintainer: {}", a))
         .collect::<Vec<_>>()
         .join("\n");
-    let source: Cow<str> = match (crates, no_bin) {
-        (false, _) | (true, false) => package
+    // A non-binary PKGBUILD from `crates.io` will use `crates.io` as the source directly.
+    let source: Cow<str> = if !(crates && no_bin) {
+        package
             .git_host()
             .unwrap_or(GitHost::Github)
-            .source(&config.package, no_bin).into(),
-        (true, true) => "$pkgname-$pkgver.tar.gz::https://static.crates.io/crates/$pkgname/$pkgname-$pkgver.crate".into(),
+            .source(&config.package, no_bin)
+            .into()
+    } else {
+        "$pkgname-$pkgver.tar.gz::https://static.crates.io/crates/$pkgname/$pkgname-$pkgver.crate"
+            .into()
     };
     let pkgname: Cow<str> = if no_bin {
         package.name.as_str().into()
