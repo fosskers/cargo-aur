@@ -103,6 +103,23 @@ package() {
 }
 ```
 
+### `backup`
+
+The `backup` list can be used to define files that may contain user-made changes that should be preserved if the package is removed or upgraded. File paths should not contain a leading slash. So this config:
+
+```toml
+[package.metadata.aur]
+backup = ["etc/your-app/foo.txt", "etc/your-app/bar.txt"]
+```
+
+will result in this:
+
+```
+backup=("etc/your-app/foo.txt", "etc/your-app/bar.txt")
+```
+
+If, for example, the `/etc/your-app/foo.txt` file is modified compared to the packaged file and the package is upgraded, the packaged file will be created as `/etc/your-app/foo.txt.pacnew` and not override the file which contains user-made changes.
+
 ### Custom commands within `package()`
 
 The `custom` list can be used to add specific commands to the `package()`
@@ -137,7 +154,7 @@ Run with `--musl` to produce a release binary that is statically linked via
     not a dynamic executable
 ```
 
-[0]: https://rust-lang.github.io/api-guidelines/documentation.html#c-metadata 
+[0]: https://rust-lang.github.io/api-guidelines/documentation.html#c-metadata
 [1]: https://github.com/fosskers/aura
 [2]: https://musl.libc.org/
 [3]: https://github.com/fosskers/cargo-aur/actions
