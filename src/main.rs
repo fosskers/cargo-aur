@@ -220,6 +220,20 @@ where
 
     writeln!(file, "source=(\"{}\")", source)?;
     writeln!(file, "sha256sums=(\"{}\")", sha256)?;
+
+    // Handle non-package() package.metadata.
+    if let Some(aur) = package.metadata.as_ref().and_then(|m| m.aur.as_ref()) {
+        let backup = aur
+            .backup
+            .iter()
+            .map(|b| format!("\"{}\"", b))
+            .collect::<Vec<_>>()
+            .join(", ");
+        if !backup.is_empty() {
+            writeln!(file, "backup=({})", backup)?;
+        };
+    }
+
     writeln!(file)?;
     writeln!(file, "package() {{")?;
     writeln!(
@@ -240,6 +254,7 @@ where
         )?;
     }
 
+    // Handle package() package.metadata.
     if let Some(aur) = package.metadata.as_ref().and_then(|m| m.aur.as_ref()) {
         for (source, target) in aur.files.iter() {
             if target.has_root().not() {
