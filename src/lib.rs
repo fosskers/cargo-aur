@@ -11,15 +11,17 @@ pub enum GitHost {
 }
 
 impl GitHost {
-    pub fn source(&self, package: &Package) -> String {
+    pub fn source(&self, package: &Package, no_bin: bool) -> String {
+        // Expecting binary tarballs to be uploaded with a platform identifier.
+        let platform_identifier = if no_bin { "" } else { "-x86_64" };
         match self {
             GitHost::Github => format!(
-                "{}/releases/download/v$pkgver/{}-$pkgver-x86_64.tar.gz",
-                package.repository, package.name
+                "{}/releases/download/v$pkgver/{}-$pkgver{}.tar.gz",
+                package.repository, package.name, platform_identifier
             ),
             GitHost::Gitlab => format!(
-                "{}/-/archive/v$pkgver/{}-$pkgver-x86_64.tar.gz",
-                package.repository, package.name
+                "{}/-/archive/v$pkgver/{}-$pkgver{}.tar.gz",
+                package.repository, package.name, platform_identifier
             ),
         }
     }
@@ -40,9 +42,13 @@ pub struct Package {
 }
 
 impl Package {
-    /// The name of the tarball that should be produced from this `Package`.
+    /// The name of the binary tarball that should be produced from this `Package`.
     pub fn tarball(&self, output: &Path) -> PathBuf {
         output.join(format!("{}-{}-x86_64.tar.gz", self.name, self.version))
+    }
+    /// The name of the source tarball that should be produced from this `Package`.
+    pub fn source_tarball(&self, output: &Path) -> PathBuf {
+        output.join(format!("{}-{}.tar.gz", self.name, self.version))
     }
 
     pub fn git_host(&self) -> Option<GitHost> {
