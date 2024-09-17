@@ -42,9 +42,13 @@ pub struct Package {
 }
 
 impl Package {
-    /// The name of the tarball that should be produced from this `Package`.
+    /// The name of the binary tarball that should be produced from this `Package`.
     pub fn tarball(&self, output: &Path) -> PathBuf {
         output.join(format!("{}-{}-x86_64.tar.gz", self.name, self.version))
+    }
+    /// The name of the source tarball that should be produced from this `Package`.
+    pub fn source_tarball(&self, output: &Path) -> PathBuf {
+        output.join(format!("{}-{}.tar.gz", self.name, self.version))
     }
 
     pub fn git_host(&self) -> Option<GitHost> {

@@ -386,7 +386,7 @@ fn source_tarball(cargo_target: &Path, output: &Path, config: &Config) -> Result
     let pkgver = &config.package.version;
     let crate_file_name = format!("{pkgname}-{pkgver}.crate");
     let crate_location = cargo_target.join("package").join(crate_file_name);
-    let new_crate_location = config.package.tarball(output);
+    let new_crate_location = config.package.source_tarball(output);
     std::fs::rename(crate_location, new_crate_location)?;
     Ok(())
 }
