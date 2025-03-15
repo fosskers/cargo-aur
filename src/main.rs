@@ -2,6 +2,7 @@ mod error;
 
 use crate::error::Error;
 use cargo_aur::{GitHost, Package};
+use cargo_metadata::MetadataCommand;
 use colored::*;
 use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
@@ -99,10 +100,8 @@ fn work(args: Args) -> Result<(), Error> {
     // Where cargo expects to read and write to. By default we want to read the
     // built binary from `target/release` and we want to write our results to
     // `target/cargo-aur`, but these are configurable by the user.
-    let cargo_target: PathBuf = match std::env::var_os("CARGO_TARGET_DIR") {
-        Some(p) => PathBuf::from(p),
-        None => PathBuf::from("target"),
-    };
+    let metadata = MetadataCommand::new().exec()?;
+    let cargo_target: PathBuf = metadata.target_directory.canonicalize()?;
 
     let output = args.output.unwrap_or(cargo_target.join("cargo-aur"));
 
