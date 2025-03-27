@@ -51,6 +51,12 @@ If you wish, you can now run `makepkg` to ensure that your package actually buil
 ==> Finished making: cargo-aur-bin 1.0.0-1 (Wed 10 Jun 2020 08:23:47 PM PDT)
 ```
 
+You can also run `namcap` to verify your package doesn't have errors.
+
+```sh
+> namcap *.zst
+```
+
 Notice that the built package itself is postfixed with `-bin`, which follows the
 AUR standard.
 
