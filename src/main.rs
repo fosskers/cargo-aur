@@ -103,7 +103,12 @@ fn work(args: Args) -> Result<(), Error> {
     let metadata = MetadataCommand::new().exec()?;
     let cargo_target: PathBuf = metadata.target_directory.canonicalize()?;
 
-    let output = args.output.unwrap_or(cargo_target.join("cargo-aur"));
+    let output = if let Some(pkgname) = metadata.root_package() {
+        args.output
+            .unwrap_or(cargo_target.join("cargo-aur").join(&pkgname.name))
+    } else {
+        args.output.unwrap_or(cargo_target.join("cargo-aur"))
+    };
 
     // Ensure the target can actually be written to. Otherwise the `tar`
     // operation later on will fail.
