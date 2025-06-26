@@ -163,6 +163,8 @@ pub struct AUR {
     #[serde(default)]
     optdepends: Vec<String>,
     #[serde(default)]
+    pub backup: Vec<String>,
+    #[serde(default)]
     pub files: Vec<(PathBuf, PathBuf)>,
     #[serde(default)]
     pub custom: Vec<String>,
