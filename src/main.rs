@@ -1,3 +1,4 @@
+mod crates;
 mod error;
 
 use crate::error::Error;
@@ -6,6 +7,7 @@ use colored::*;
 use gumdrop::{Options, ParsingStyle};
 use hmac_sha256::Hash;
 use serde::Deserialize;
+use std::borrow::Cow;
 use std::fs::{DirEntry, File};
 use std::io::{BufWriter, Write};
 use std::ops::Not;
@@ -45,6 +47,10 @@ struct Args {
     musl: bool,
     /// Don't actually build anything.
     dryrun: bool,
+    /// Obtain source code from matching crate from `crates.io` instead of the current directory.
+    crates: bool,
+    /// Don't build a binary. Instead, create a PKGBUILD that will build from source.
+    no_bin: bool,
     /// Absorbs any extra junk arguments.
     #[options(free)]
     free: Vec<String>,
@@ -119,22 +125,51 @@ fn work(args: Args) -> Result<(), Error> {
         }
     }
 
-    let license = if must_copy_license(&config.package.license) {
-        p("LICENSE file will be installed manually.".bold().yellow());
-        Some(license_file()?)
-    } else {
-        None
-    };
-
     if args.dryrun.not() {
-        release_build(args.musl)?;
-        tarball(args.musl, &cargo_target, &output, license.as_ref(), &config)?;
-        let sha256: String = sha256sum(&config.package, &output)?;
+        let (sha256, license) = match (args.crates, args.no_bin) {
+            (true, true) => {
+                let crate_file = crates::CrateFile::download_new(&config)?;
+                let sha256 = crate_file.get_sha256sum()?;
+                let license = crate_file.get_license()?;
+                (sha256, license)
+            }
+            (true, false) => {
+                let crate_file = crates::CrateFile::download_new(&config)?;
+                let built_crate_file = crate_file.build(args.musl)?;
+                let license = built_crate_file.tarball(&cargo_target)?;
+                let sha256 = sha256sum(&config.package, &output)?;
+                (sha256, license)
+            }
+            (false, true) => {
+                source_tarball(&cargo_target, &output, &config)?;
+                let license = alert_if_must_copy_license(&config.package.license)
+                    .then(|| license_file(None))
+                    .transpose()?;
+                let sha256 = sha256sum(&config.package, &output)?;
+                (sha256, license)
+            }
+            (false, false) => {
+                release_build(args.musl)?;
+                let license = alert_if_must_copy_license(&config.package.license)
+                    .then(|| license_file(None))
+                    .transpose()?;
+                tarball(args.musl, &cargo_target, &output, license.as_ref(), &config)?;
+                let sha256 = sha256sum(&config.package, &output)?;
+                (sha256, license)
+            }
+        };
 
         // Write the PKGBUILD.
         let path = output.join("PKGBUILD");
         let file = BufWriter::new(File::create(path)?);
-        pkgbuild(file, &config, &sha256, license.as_ref())?;
+        pkgbuild(
+            file,
+            &config,
+            &sha256,
+            license.as_ref(),
+            args.crates,
+            args.no_bin,
+        )?;
     }
 
     Ok(())
@@ -150,6 +185,16 @@ fn cargo_config() -> Result<Config, Error> {
     Ok(proj)
 }
 
+/// Alert the user if the license must be copied, and then return true
+/// if the user was alerted.
+fn alert_if_must_copy_license(license: &str) -> bool {
+    if must_copy_license(license) {
+        p("LICENSE file will be installed manually.".bold().yellow());
+        return true;
+    }
+    false
+}
+
 /// If a AUR package's license isn't included in `/usr/share/licenses/common/`,
 /// then it must be installed manually by the PKGBUILD. MIT and BSD3 are such
 /// missing licenses, and since many Rust crates use them we must make this
@@ -159,8 +204,11 @@ fn must_copy_license(license: &str) -> bool {
 }
 
 /// The path to the `LICENSE` file.
-fn license_file() -> Result<DirEntry, Error> {
-    std::fs::read_dir(".")?
+/// First parameter sets the directory to search for it, or if None, it will
+/// utilise the current directory.
+fn license_file(change_dir_to: Option<&Path>) -> Result<DirEntry, Error> {
+    let path = change_dir_to.unwrap_or(Path::new("."));
+    std::fs::read_dir(path)?
         .filter_map(|entry| entry.ok())
         .find(|entry| {
             entry
@@ -178,6 +226,8 @@ fn pkgbuild<T>(
     config: &Config,
     sha256: &str,
     license: Option<&DirEntry>,
+    crates: bool,
+    no_bin: bool,
 ) -> Result<(), Error>
 where
     T: Write,
@@ -189,10 +239,22 @@ where
         .map(|a| format!("# Maintainer: {}", a))
         .collect::<Vec<_>>()
         .join("\n");
-    let source = package
-        .git_host()
-        .unwrap_or(GitHost::Github)
-        .source(&config.package);
+    // A non-binary PKGBUILD from `crates.io` will use `crates.io` as the source directly.
+    let source: Cow<str> = if !(crates && no_bin) {
+        package
+            .git_host()
+            .unwrap_or(GitHost::Github)
+            .source(&config.package, no_bin)
+            .into()
+    } else {
+        "$pkgname-$pkgver.tar.gz::https://static.crates.io/crates/$pkgname/$pkgname-$pkgver.crate"
+            .into()
+    };
+    let pkgname: Cow<str> = if no_bin {
+        package.name.as_str().into()
+    } else {
+        format!("{}-bin", package.name).into()
+    };
 
     writeln!(file, "{}", authors)?;
     writeln!(file, "#")?;
@@ -201,15 +263,17 @@ where
         "# This PKGBUILD was generated by `cargo aur`: https://crates.io/crates/cargo-aur"
     )?;
     writeln!(file)?;
-    writeln!(file, "pkgname={}-bin", package.name)?;
+    writeln!(file, "pkgname={}", pkgname)?;
     writeln!(file, "pkgver={}", package.version)?;
     writeln!(file, "pkgrel=1")?;
     writeln!(file, "pkgdesc=\"{}\"", package.description)?;
     writeln!(file, "url=\"{}\"", package.url())?;
     writeln!(file, "license=(\"{}\")", package.license)?;
     writeln!(file, "arch=(\"x86_64\")")?;
-    writeln!(file, "provides=(\"{}\")", package.name)?;
-    writeln!(file, "conflicts=(\"{}\")", package.name)?;
+    if !no_bin {
+        writeln!(file, "provides=(\"{}\")", package.name)?;
+        writeln!(file, "conflicts=(\"{}\")", package.name)?;
+    }
 
     match package.metadata.as_ref() {
         Some(metadata) if metadata.non_empty() => {
@@ -221,12 +285,50 @@ where
     writeln!(file, "source=(\"{}\")", source)?;
     writeln!(file, "sha256sums=(\"{}\")", sha256)?;
     writeln!(file)?;
+    // Include the prepare, build and check steps for non-binary package.
+    if no_bin {
+        writeln!(file, "prepare() {{")?;
+        writeln!(file, "    cd $pkgname-$pkgver")?;
+        writeln!(file, "    export RUSTUP_TOOLCHAIN=stable")?;
+        writeln!(
+            file,
+            "    cargo fetch --locked --target \"$(rustc -vV | sed -n 's/host: //p')\""
+        )?;
+        writeln!(file, "}}")?;
+        writeln!(file)?;
+        writeln!(file, "build() {{")?;
+        writeln!(file, "    cd $pkgname-$pkgver")?;
+        writeln!(file, "    export RUSTUP_TOOLCHAIN=stable")?;
+        writeln!(file, "    export CARGO_TARGET_DIR=target")?;
+        writeln!(file, "    cargo build --frozen --release --all-features")?;
+        writeln!(file, "}}")?;
+        writeln!(file)?;
+        writeln!(file, "check() {{")?;
+        writeln!(file, "    cd $pkgname-$pkgver")?;
+        writeln!(file, "    export RUSTUP_TOOLCHAIN=stable")?;
+        writeln!(file, "    cargo test --frozen --all-features")?;
+        writeln!(file, "}}")?;
+        writeln!(file)?;
+    }
     writeln!(file, "package() {{")?;
-    writeln!(
-        file,
-        "    install -Dm755 {} -t \"$pkgdir/usr/bin\"",
-        config.binary_name()
-    )?;
+    // Install command for binary differs depending on bin/no_bin.
+    if no_bin {
+        // .crate files built by `cargo publish` contain an inner
+        // folder that we need to cd into.
+        writeln!(file, "    cd $pkgname-$pkgver")?;
+        // When building from source, binary will be in the target/release directory.
+        writeln!(
+            file,
+            "    install -Dm755 target/release/{} -t \"$pkgdir/usr/bin\"",
+            config.binary_name()
+        )?;
+    } else {
+        writeln!(
+            file,
+            "    install -Dm755 {} -t \"$pkgdir/usr/bin\"",
+            config.binary_name()
+        )?;
+    };
 
     if let Some(lic) = license {
         let file_name = lic
@@ -276,6 +378,23 @@ fn release_build(musl: bool) -> Result<(), Error> {
     Ok(())
 }
 
+/// Build a source tarball from the current (project) directory.
+/// Utilises `cargo --publish --dry-run` under the hood to do the packaging.
+fn source_tarball(cargo_target: &Path, output: &Path, config: &Config) -> Result<(), Error> {
+    let args = ["publish", "--dry-run", "--allow-dirty"];
+    let status = Command::new("cargo").args(args).status()?;
+    if !status.success() {
+        return Err(Error::Compressing);
+    };
+    let pkgname = &config.package.name;
+    let pkgver = &config.package.version;
+    let crate_file_name = format!("{pkgname}-{pkgver}.crate");
+    let crate_location = cargo_target.join("package").join(crate_file_name);
+    let new_crate_location = config.package.source_tarball(output);
+    std::fs::rename(crate_location, new_crate_location)?;
+    Ok(())
+}
+
 fn tarball(
     musl: bool,
     cargo_target: &Path,
@@ -303,7 +422,11 @@ fn tarball(
         .arg(config.package.tarball(output))
         .arg(binary_name);
     if let Some(lic) = license {
-        command.arg(lic.path());
+        // NOTE: -C is required, as license may not be in the current directory,
+        // but we want it to end up at the root of the tarball.
+        command.arg("-C");
+        command.arg(lic.path().with_file_name(""));
+        command.arg(lic.file_name());
     }
     if let Some(files) = config
         .package
@@ -316,7 +439,9 @@ fn tarball(
             command.arg(file);
         }
     }
-    command.status()?;
+    if !command.status()?.success() {
+        return Err(Error::Compressing);
+    }
 
     std::fs::remove_file(binary_name)?;
 
