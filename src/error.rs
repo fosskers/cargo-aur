@@ -10,6 +10,7 @@ pub(crate) enum Error {
     MissingMuslTarget,
     MissingLicense,
     TargetNotAbsolute(PathBuf),
+    Metadata(cargo_metadata::Error),
 }
 
 impl Display for Error {
@@ -29,6 +30,9 @@ impl Display for Error {
             Error::TargetNotAbsolute(p) => {
                 write!(f, "Target filepath is not absolute: {}", p.display())
             }
+            Error::Metadata(m) => {
+                write!(f, "Failed to gather metadata: {}", m)
+            }
         }
     }
 }
@@ -36,6 +40,12 @@ impl Display for Error {
 impl From<std::str::Utf8Error> for Error {
     fn from(v: std::str::Utf8Error) -> Self {
         Self::Utf8(v)
+    }
+}
+
+impl From<cargo_metadata::Error> for Error {
+    fn from(v: cargo_metadata::Error) -> Self {
+        Self::Metadata(v)
     }
 }
 
