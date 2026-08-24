@@ -58,12 +58,13 @@ struct Config {
 }
 
 impl Config {
-    /// The name of the compiled binary that should be copied to the tarball.
-    fn binary_name(&self) -> &str {
-        self.bin
-            .first()
-            .map(|bin| bin.name.as_str())
-            .unwrap_or(self.package.name.as_str())
+    /// The name of the compiled binaries that should be copied to the tarball.
+    fn binaries_name(&self) -> Vec<&str> {
+        if self.bin.is_empty() {
+            vec![self.package.name.as_str()]
+        } else {
+            self.bin.iter().map(|bin| bin.name.as_str()).collect()
+        }
     }
 }
 
@@ -222,11 +223,9 @@ where
     writeln!(file, "sha256sums=(\"{}\")", sha256)?;
     writeln!(file)?;
     writeln!(file, "package() {{")?;
-    writeln!(
-        file,
-        "    install -Dm755 {} -t \"$pkgdir/usr/bin\"",
-        config.binary_name()
-    )?;
+    for name in config.binaries_name() {
+        writeln!(file, "    install -Dm755 {} -t \"$pkgdir/usr/bin\"", name)?;
+    }
 
     if let Some(lic) = license {
         let file_name = lic
@@ -289,11 +288,14 @@ fn tarball(
         "release"
     };
 
-    let binary_name = config.binary_name();
-    let binary = cargo_target.join(release_dir).join(binary_name);
+    let binaries_name = config.binaries_name();
+    for binary_name in &binaries_name {
+        let binary = cargo_target.join(release_dir).join(binary_name);
 
-    strip(&binary)?;
-    std::fs::copy(binary, binary_name)?;
+        strip(&binary)?;
+        std::fs::copy(binary, binary_name)?;
+        println!("{:?}", binary_name);
+    }
 
     // Create the tarball.
     p("Packing tarball...".bold());
@@ -301,7 +303,7 @@ fn tarball(
     command
         .arg("czf")
         .arg(config.package.tarball(output))
-        .arg(binary_name);
+        .args(&binaries_name);
     if let Some(lic) = license {
         command.arg(lic.path());
     }
@@ -318,7 +320,9 @@ fn tarball(
     }
     command.status()?;
 
-    std::fs::remove_file(binary_name)?;
+    for binary_name in &binaries_name {
+        std::fs::remove_file(binary_name)?;
+    }
 
     Ok(())
 }
