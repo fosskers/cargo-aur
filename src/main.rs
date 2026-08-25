@@ -290,11 +290,10 @@ fn tarball(
 
     let binaries_name = config.binaries_name();
     for binary_name in &binaries_name {
-        let binary = cargo_target.join(release_dir).join(binary_name);
+        let binary_path = cargo_target.join(release_dir).join(binary_name);
 
-        strip(&binary)?;
-        std::fs::copy(binary, binary_name)?;
-        println!("{:?}", binary_name);
+        strip(binary_name, &binary_path)?;
+        std::fs::copy(binary_path, binary_name)?;
     }
 
     // Create the tarball.
@@ -329,8 +328,8 @@ fn tarball(
 
 /// Strip the release binary, so that we aren't compressing more bytes than we
 /// need to.
-fn strip(path: &Path) -> Result<(), Error> {
-    p("Stripping binary...".bold());
+fn strip(binary_name: &str, path: &Path) -> Result<(), Error> {
+    p(format!("Stripping binary {}...", binary_name).bold());
     Command::new("strip").arg(path).status()?;
     Ok(()) // FIXME Would love to use my `void` package here and elsewhere.
 }
